@@ -1,0 +1,47 @@
+version: '3.8'
+
+services:
+  # PostgreSQL Database
+  db:
+    image: postgres:14-alpine
+    container_name: familytree-db
+    environment:
+      POSTGRES_DB: familytree
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - familytree-network
+
+  # FastAPI Application
+  web:
+    build: .
+    container_name: familytree-web
+    environment:
+      DATABASE_URL: postgresql+asyncpg://postgres:postgres@db:5432/familytree
+    ports:
+      - "8000:8000"
+    depends_on:
+      db:
+        condition: service_healthy
+    volumes:
+      - ./app:/app/app
+      - ./static:/app/static
+    networks:
+      - familytree-network
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
+
+networks:
+  familytree-network:
+    driver: bridge

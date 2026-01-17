@@ -1,7 +1,20 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
+from contextlib import asynccontextmanager
+from app.database import init_db
+from app.routers import auth, family_tree
 
-app = FastAPI(title="My Web App", version="1.0.0")
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Startup: Initialize database
+    await init_db()
+    yield
+    # Shutdown: cleanup if needed
+
+
+app = FastAPI(title="Family Tree App", version="1.0.0", lifespan=lifespan)
 
 # Configure CORS
 app.add_middleware(
@@ -12,20 +25,15 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# Include routers
+app.include_router(auth.router)
+app.include_router(family_tree.router)
 
-@app.get("/")
-async def root():
-    """Root endpoint returning a welcome message."""
-    return {"message": "Welcome to My Web App!"}
+# Mount static files
+app.mount("/static", StaticFiles(directory="static"), name="static")
 
 
 @app.get("/health")
 async def health_check():
     """Health check endpoint."""
     return {"status": "healthy"}
-
-
-@app.get("/api/hello/{name}")
-async def hello(name: str):
-    """Greet a user by name."""
-    return {"message": f"Hello, {name}!"}
