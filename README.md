@@ -209,16 +209,36 @@ my-web-app/
 ├── Dockerfile               # Docker container configuration
 ├── docker-compose.yml       # Docker Compose orchestration
 ├── .dockerignore           # Docker build exclusions
+├── .github/
+│   └── workflows/
+│       ├── ci.yml          # CI pipeline (tests, build, scan)
+│       └── deploy-gcp.yml  # GCP deployment pipeline
 ├── cloudbuild.yaml         # Google Cloud Build configuration
 ├── .gcloudignore           # Google Cloud build exclusions
 ├── deploy-gcp.sh           # Automated GCP deployment script
 ├── GCP_DEPLOYMENT.md       # Detailed GCP deployment guide
+├── GITHUB_ACTIONS.md       # GitHub Actions setup guide
 ├── requirements.txt         # Python dependencies
 ├── .env.example            # Environment variables template
 └── README.md               # This file
 ```
 
 ## Deployment
+
+### GitHub Actions CI/CD (Recommended)
+
+Automated deployment using GitHub Actions. Every push to `main` automatically deploys to Google Cloud.
+
+**Setup:**
+1. Follow the [GitHub Actions Setup Guide](GITHUB_ACTIONS.md)
+2. Configure secrets in GitHub repository settings
+3. Push to `main` branch - automatic deployment!
+
+**Workflows:**
+- **CI Pipeline**: Runs tests, builds Docker image, security scans
+- **GCP Deployment**: Deploys to Cloud Run on every push to main
+
+See [GITHUB_ACTIONS.md](GITHUB_ACTIONS.md) for detailed setup instructions.
 
 ### Google Cloud Platform
 
@@ -229,7 +249,7 @@ Deploy to Google Cloud Run with Cloud SQL PostgreSQL.
 - `gcloud` CLI installed ([installation guide](https://cloud.google.com/sdk/docs/install))
 - A Google Cloud project
 
-#### Automated Deployment
+#### Manual Deployment
 
 Use the provided deployment script:
 
