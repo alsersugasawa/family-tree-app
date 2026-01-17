@@ -209,17 +209,144 @@ my-web-app/
 ├── Dockerfile               # Docker container configuration
 ├── docker-compose.yml       # Docker Compose orchestration
 ├── .dockerignore           # Docker build exclusions
+├── cloudbuild.yaml         # Google Cloud Build configuration
+├── .gcloudignore           # Google Cloud build exclusions
+├── deploy-gcp.sh           # Automated GCP deployment script
+├── GCP_DEPLOYMENT.md       # Detailed GCP deployment guide
 ├── requirements.txt         # Python dependencies
 ├── .env.example            # Environment variables template
 └── README.md               # This file
 ```
 
+## Deployment
+
+### Google Cloud Platform
+
+Deploy to Google Cloud Run with Cloud SQL PostgreSQL.
+
+#### Prerequisites
+- Google Cloud account with billing enabled
+- `gcloud` CLI installed ([installation guide](https://cloud.google.com/sdk/docs/install))
+- A Google Cloud project
+
+#### Automated Deployment
+
+Use the provided deployment script:
+
+```bash
+# Make the script executable (if not already)
+chmod +x deploy-gcp.sh
+
+# Run the deployment
+./deploy-gcp.sh
+```
+
+The script will:
+1. Enable required Google Cloud APIs
+2. Create a Cloud SQL PostgreSQL instance
+3. Set up the database
+4. Build and deploy the application to Cloud Run
+5. Configure environment variables
+
+#### Manual Deployment Steps
+
+If you prefer manual deployment:
+
+**1. Set up Google Cloud project:**
+```bash
+export PROJECT_ID="your-project-id"
+gcloud config set project $PROJECT_ID
+
+# Enable required APIs
+gcloud services enable cloudbuild.googleapis.com
+gcloud services enable run.googleapis.com
+gcloud services enable sqladmin.googleapis.com
+```
+
+**2. Create Cloud SQL instance:**
+```bash
+gcloud sql instances create familytree-db \
+  --database-version=POSTGRES_14 \
+  --tier=db-f1-micro \
+  --region=us-central1
+
+# Create database
+gcloud sql databases create familytree --instance=familytree-db
+
+# Set password for postgres user
+gcloud sql users set-password postgres \
+  --instance=familytree-db \
+  --password=YOUR_SECURE_PASSWORD
+```
+
+**3. Build and deploy:**
+```bash
+# Build the container
+gcloud builds submit --tag gcr.io/$PROJECT_ID/familytree-app
+
+# Get Cloud SQL connection name
+CONNECTION_NAME=$(gcloud sql instances describe familytree-db --format="value(connectionName)")
+
+# Deploy to Cloud Run
+gcloud run deploy familytree-app \
+  --image gcr.io/$PROJECT_ID/familytree-app \
+  --platform managed \
+  --region us-central1 \
+  --allow-unauthenticated \
+  --add-cloudsql-instances $CONNECTION_NAME \
+  --set-env-vars DATABASE_URL="postgresql+asyncpg://postgres:YOUR_PASSWORD@/familytree?host=/cloudsql/$CONNECTION_NAME"
+```
+
+**4. Access your application:**
+```bash
+# Get the service URL
+gcloud run services describe familytree-app \
+  --platform managed \
+  --region us-central1 \
+  --format="value(status.url)"
+```
+
+#### Cost Estimation
+
+- **Cloud Run**: Free tier includes 2 million requests/month
+- **Cloud SQL**: db-f1-micro is ~$7-10/month
+- **Container Registry**: First 0.5 GB free
+
+#### Updating the Application
+
+```bash
+# Rebuild and redeploy
+gcloud builds submit --tag gcr.io/$PROJECT_ID/familytree-app
+gcloud run deploy familytree-app \
+  --image gcr.io/$PROJECT_ID/familytree-app \
+  --region us-central1
+```
+
+#### Monitoring
+
+```bash
+# View logs
+gcloud run services logs read familytree-app --region us-central1
+
+# View Cloud SQL logs
+gcloud sql operations list --instance=familytree-db
+```
+
+### Other Platforms
+
+The application can also be deployed to:
+- **AWS**: Use ECS/Fargate + RDS PostgreSQL
+- **Azure**: Use Azure Container Apps + Azure Database for PostgreSQL
+- **Heroku**: Use Heroku Postgres + Container Registry
+- **DigitalOcean**: Use App Platform + Managed PostgreSQL
+
 ## Security Notes
 
 - Change the `SECRET_KEY` in `app/auth.py` for production use
 - Use strong passwords for your database
-- Enable HTTPS in production
+- Enable HTTPS in production (automatically enabled on Cloud Run)
 - Update CORS settings in `app/main.py` for production
+- Store sensitive credentials in Secret Manager (Google Cloud) or similar services
 
 ## Troubleshooting
 
