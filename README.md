@@ -55,8 +55,8 @@ docker-compose down -v
 ```
 
 The application will be available at:
-- **Web App**: `http://localhost:8000/static/index.html`
-- **API Docs**: `http://localhost:8000/docs`
+- **Web App**: `http://localhost:8080/static/index.html`
+- **API Docs**: `http://localhost:8080/docs`
 
 #### 3. Managing the Containers
 
@@ -144,14 +144,14 @@ uvicorn app.main:app --reload
 ```
 
 The application will be available at:
-- **Web App**: `http://localhost:8000/static/index.html`
-- **API Docs**: `http://localhost:8000/docs`
+- **Web App**: `http://localhost:8080/static/index.html`
+- **API Docs**: `http://localhost:8080/docs`
 
 ## Usage
 
 ### Getting Started
 
-1. Open `http://localhost:8000/static/index.html` in your browser
+1. Open `http://localhost:8080/static/index.html` in your browser
 2. Click "Register here" to create a new account
 3. After registration, you'll be automatically logged in
 4. Click "Add Family Member" to start building your family tree
