@@ -232,79 +232,25 @@ function renderFamilyTree() {
     currentZoom = zoom;
     currentSvg = svg;
 
-    // Set initial transform to center the tree
-    const initialTransform = d3.zoomIdentity.translate(50, 50);
+    // Set initial transform to position the tree with parents at top
+    const initialTransform = d3.zoomIdentity.translate(50, 80);
     svg.call(zoom.transform, initialTransform);
 
     const g = container.append('g');
 
-    // Calculate tree base position
-    const treeBase = { x: width / 2, y: height - 100 };
     const allNodes = root.descendants().filter(d => !d.data.isVirtual);
 
-    // Draw tree trunk
-    const trunkWidth = 60;
-    const trunkHeight = 150;
-    g.append('path')
-        .attr('class', 'tree-trunk')
-        .attr('d', `
-            M ${treeBase.x - trunkWidth/2} ${treeBase.y}
-            L ${treeBase.x - trunkWidth/2 + 5} ${treeBase.y - trunkHeight}
-            Q ${treeBase.x} ${treeBase.y - trunkHeight - 20} ${treeBase.x + trunkWidth/2 - 5} ${treeBase.y - trunkHeight}
-            L ${treeBase.x + trunkWidth/2} ${treeBase.y}
-            Z
-        `)
-        .attr('fill', '#8B4513')
-        .attr('stroke', '#654321')
-        .attr('stroke-width', 2);
-
-    // Add trunk texture with lines
-    for (let i = 0; i < 8; i++) {
-        const yPos = treeBase.y - (i * 18) - 10;
-        g.append('line')
-            .attr('x1', treeBase.x - trunkWidth/2 + 5)
-            .attr('y1', yPos)
-            .attr('x2', treeBase.x + trunkWidth/2 - 5)
-            .attr('y2', yPos)
-            .attr('stroke', '#654321')
-            .attr('stroke-width', 1)
-            .attr('opacity', 0.3);
-    }
-
-    // Draw branch links with organic curves (skip links from virtual root)
-    const links = root.links().filter(d => !d.source.data.isVirtual);
-
-    g.selectAll('.branch')
-        .data(links)
+    // Draw links
+    g.selectAll('.link')
+        .data(root.links().filter(d => !d.source.data.isVirtual))
         .enter()
         .append('path')
-        .attr('class', 'branch')
-        .attr('d', d => {
-            // Create curved branch paths
-            const sourceX = d.source.x;
-            const sourceY = d.source.y;
-            const targetX = d.target.x;
-            const targetY = d.target.y;
+        .attr('class', 'link')
+        .attr('d', d3.linkVertical()
+            .x(d => d.x)
+            .y(d => d.y));
 
-            // Control points for bezier curve to create natural branch
-            const midY = (sourceY + targetY) / 2;
-            const cp1x = sourceX;
-            const cp1y = midY;
-            const cp2x = targetX;
-            const cp2y = midY;
-
-            return `M ${sourceX},${sourceY}
-                    C ${cp1x},${cp1y} ${cp2x},${cp2y} ${targetX},${targetY}`;
-        })
-        .attr('fill', 'none')
-        .attr('stroke', '#8B4513')
-        .attr('stroke-width', d => {
-            // Thicker branches closer to trunk
-            const depth = d.target.depth;
-            return Math.max(3, 10 - depth * 1.5);
-        });
-
-    // Draw partner/marriage links as delicate vines
+    // Draw partner/marriage links
     const drawnPartners = new Set();
     allNodes.forEach(node => {
         if (partnerPairs.has(node.data.id)) {
@@ -314,76 +260,39 @@ function renderFamilyTree() {
                     drawnPartners.add(pairKey);
                     const partnerNode = allNodes.find(n => n.data.id === partnerId);
                     if (partnerNode) {
-                        g.append('path')
-                            .attr('class', 'partner-vine')
-                            .attr('d', () => {
-                                const x1 = node.x;
-                                const y1 = node.y;
-                                const x2 = partnerNode.x;
-                                const y2 = partnerNode.y;
-                                const midX = (x1 + x2) / 2;
-                                const midY = (y1 + y2) / 2 - 20;
-                                return `M ${x1},${y1} Q ${midX},${midY} ${x2},${y2}`;
-                            })
-                            .attr('fill', 'none')
+                        g.append('line')
+                            .attr('class', 'partner-link')
+                            .attr('x1', node.x)
+                            .attr('y1', node.y)
+                            .attr('x2', partnerNode.x)
+                            .attr('y2', partnerNode.y)
                             .attr('stroke', '#ff69b4')
-                            .attr('stroke-width', 2)
-                            .attr('stroke-dasharray', '3,3')
-                            .attr('opacity', 0.6);
+                            .attr('stroke-width', 3)
+                            .attr('stroke-dasharray', '5,5');
                     }
                 }
             });
         }
     });
 
-    // Draw nodes as leaves
+    // Draw nodes
     const nodes = g.selectAll('.node')
         .data(allNodes)
         .enter()
         .append('g')
-        .attr('class', d => `node leaf ${d.data.gender ? d.data.gender.toLowerCase() : ''}`)
+        .attr('class', d => `node ${d.data.gender ? d.data.gender.toLowerCase() : ''}`)
         .attr('transform', d => `translate(${d.x},${d.y})`)
         .on('click', (event, d) => {
             event.stopPropagation();
             showMemberDetails(d.data.id);
         });
 
-    // Create leaf shapes
-    nodes.append('path')
-        .attr('class', 'leaf-shape')
-        .attr('d', 'M 0,-20 Q 15,-15 20,0 Q 15,15 0,20 Q -15,15 -20,0 Q -15,-15 0,-20 Z')
-        .attr('fill', d => {
-            if (d.data.death_date) {
-                return '#CD853F'; // Brown for deceased
-            }
-            return d.data.gender === 'Male' ? '#90EE90' : '#FFB6C1'; // Light green for male, light pink for female
-        })
-        .attr('stroke', d => {
-            if (d.data.death_date) {
-                return '#8B4513';
-            }
-            return d.data.gender === 'Male' ? '#228B22' : '#FF69B4';
-        })
-        .attr('stroke-width', 2)
-        .attr('opacity', 0.9);
+    nodes.append('circle')
+        .attr('r', 25);
 
-    // Add leaf vein (center line)
-    nodes.append('line')
-        .attr('x1', 0)
-        .attr('y1', -18)
-        .attr('x2', 0)
-        .attr('y2', 18)
-        .attr('stroke', d => d.data.death_date ? '#8B4513' : '#2F4F2F')
-        .attr('stroke-width', 1)
-        .attr('opacity', 0.4);
-
-    // Add name below leaf
     nodes.append('text')
-        .attr('dy', 35)
+        .attr('dy', 40)
         .attr('text-anchor', 'middle')
-        .attr('font-size', '11px')
-        .attr('font-weight', 'bold')
-        .attr('fill', '#2C3E50')
         .text(d => `${d.data.first_name} ${d.data.last_name}`);
 
     // Add sibling count badge if there are siblings

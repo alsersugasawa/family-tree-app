@@ -232,7 +232,7 @@ body {
 
 #tree-svg {
     border: 1px solid #e0e0e0;
-    background: linear-gradient(to bottom, #E8F5E9 0%, #F1F8E9 100%);
+    background: white;
     border-radius: 5px;
     cursor: grab;
 }
@@ -313,52 +313,41 @@ body {
     color: #666;
 }
 
-/* Tree Trunk and Branches */
-.tree-trunk {
-    fill: #8B4513;
-    stroke: #654321;
-    stroke-width: 2px;
-}
-
-.branch {
-    fill: none;
-    stroke: #8B4513;
-    stroke-linecap: round;
-    stroke-linejoin: round;
-}
-
-.partner-vine {
-    fill: none;
-    stroke: #ff69b4;
-    stroke-width: 2px;
-    stroke-dasharray: 3, 3;
-    opacity: 0.6;
-}
-
-/* Leaf Node Styles */
-.node.leaf {
+/* Tree Node Styles */
+.node {
     cursor: pointer;
-    transition: transform 0.2s ease;
 }
 
-.node.leaf:hover {
-    transform: scale(1.1);
-}
-
-.leaf-shape {
-    transition: opacity 0.2s ease, filter 0.2s ease;
-}
-
-.node.leaf:hover .leaf-shape {
-    opacity: 1;
-    filter: brightness(1.1);
+.node circle {
+    fill: #667eea;
+    stroke: #5568d3;
+    stroke-width: 2px;
 }
 
 .node text {
-    font-size: 11px;
-    fill: #2C3E50;
-    font-weight: bold;
-    pointer-events: none;
+    font-size: 12px;
+    fill: #333;
+}
+
+.node.male circle {
+    fill: #3498db;
+}
+
+.node.female circle {
+    fill: #e91e63;
+}
+
+.link {
+    fill: none;
+    stroke: #999;
+    stroke-width: 2px;
+}
+
+.partner-link {
+    stroke: #ff69b4;
+    stroke-width: 3px;
+    stroke-dasharray: 5, 5;
+    opacity: 0.8;
 }
 
 /* Details Panel */
