@@ -294,28 +294,6 @@ function renderFamilyTree() {
         .attr('dy', 40)
         .attr('text-anchor', 'middle')
         .text(d => `${d.data.first_name} ${d.data.last_name}`);
-
-    // Add sibling count badge if there are siblings
-    nodes.filter(d => d.data.siblings && d.data.siblings.length > 0)
-        .append('circle')
-        .attr('class', 'sibling-badge')
-        .attr('cx', 25)
-        .attr('cy', -15)
-        .attr('r', 10)
-        .attr('fill', '#ff9800')
-        .attr('stroke', '#f57c00')
-        .attr('stroke-width', 2);
-
-    nodes.filter(d => d.data.siblings && d.data.siblings.length > 0)
-        .append('text')
-        .attr('class', 'sibling-count')
-        .attr('x', 25)
-        .attr('y', -12)
-        .attr('text-anchor', 'middle')
-        .attr('fill', 'white')
-        .attr('font-size', '9px')
-        .attr('font-weight', 'bold')
-        .text(d => `+${d.data.siblings.length}`);
 }
 
 function buildTreeHierarchy(member, processedMembers = new Set(), globalProcessedChildren = new Set()) {
@@ -331,41 +309,17 @@ function buildTreeHierarchy(member, processedMembers = new Set(), globalProcesse
         !globalProcessedChildren.has(m.id) // Skip if already processed globally
     );
 
-    // Group children by their parent pairs (father_id, mother_id combination)
-    const childGroups = new Map();
-
+    // Mark all children as processed and add them all to the tree
+    const expandedChildren = [];
     allChildren.forEach(child => {
-        const parentKey = `${child.father_id || 'none'}-${child.mother_id || 'none'}`;
-        if (!childGroups.has(parentKey)) {
-            childGroups.set(parentKey, []);
-        }
-        childGroups.get(parentKey).push(child);
-    });
-
-    // For each unique parent pair, add only one representative child with siblings
-    const uniqueChildren = [];
-    childGroups.forEach((siblings) => {
-        // Mark all these children as processed globally
-        siblings.forEach(s => globalProcessedChildren.add(s.id));
-
-        // Use the first child as representative and attach siblings
-        const representative = siblings[0];
-        const childNode = buildTreeHierarchy(representative, new Set(processedMembers), globalProcessedChildren);
-
-        // Add sibling information
-        childNode.siblings = siblings.slice(1).map(s => ({
-            id: s.id,
-            first_name: s.first_name,
-            last_name: s.last_name,
-            gender: s.gender
-        }));
-
-        uniqueChildren.push(childNode);
+        globalProcessedChildren.add(child.id);
+        const childNode = buildTreeHierarchy(child, new Set(processedMembers), globalProcessedChildren);
+        expandedChildren.push(childNode);
     });
 
     return {
         ...member,
-        children: uniqueChildren
+        children: expandedChildren
     };
 }
 
@@ -645,5 +599,117 @@ function resetZoom() {
     if (currentZoom && currentSvg) {
         const initialTransform = d3.zoomIdentity.translate(50, 50);
         currentSvg.transition().duration(500).call(currentZoom.transform, initialTransform);
+    }
+}
+
+// Account Settings Functions
+function showAccountSettings() {
+    document.getElementById('account-settings-modal').style.display = 'flex';
+    document.getElementById('new-email').value = currentUser.email;
+
+    // Clear error messages
+    document.getElementById('email-error').textContent = '';
+    document.getElementById('password-error').textContent = '';
+    document.getElementById('delete-error').textContent = '';
+
+    // Clear password fields
+    document.getElementById('current-password').value = '';
+    document.getElementById('new-password').value = '';
+    document.getElementById('confirm-password').value = '';
+    document.getElementById('delete-password').value = '';
+}
+
+function closeAccountSettings() {
+    document.getElementById('account-settings-modal').style.display = 'none';
+}
+
+async function updateEmail(event) {
+    event.preventDefault();
+    const newEmail = document.getElementById('new-email').value;
+    const errorDiv = document.getElementById('email-error');
+    errorDiv.textContent = '';
+
+    try {
+        const response = await fetch(`${API_BASE}/api/auth/update-email?new_email=${encodeURIComponent(newEmail)}`, {
+            method: 'PUT',
+            headers: {
+                'Authorization': `Bearer ${authToken}`
+            }
+        });
+
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.detail || 'Failed to update email');
+        }
+
+        alert('Email updated successfully!');
+        await loadUser();
+    } catch (error) {
+        errorDiv.textContent = error.message;
+    }
+}
+
+async function updatePassword(event) {
+    event.preventDefault();
+    const currentPassword = document.getElementById('current-password').value;
+    const newPassword = document.getElementById('new-password').value;
+    const confirmPassword = document.getElementById('confirm-password').value;
+    const errorDiv = document.getElementById('password-error');
+    errorDiv.textContent = '';
+
+    if (newPassword !== confirmPassword) {
+        errorDiv.textContent = 'New passwords do not match';
+        return;
+    }
+
+    try {
+        const response = await fetch(`${API_BASE}/api/auth/update-password?current_password=${encodeURIComponent(currentPassword)}&new_password=${encodeURIComponent(newPassword)}`, {
+            method: 'PUT',
+            headers: {
+                'Authorization': `Bearer ${authToken}`
+            }
+        });
+
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.detail || 'Failed to update password');
+        }
+
+        alert('Password updated successfully!');
+        document.getElementById('current-password').value = '';
+        document.getElementById('new-password').value = '';
+        document.getElementById('confirm-password').value = '';
+    } catch (error) {
+        errorDiv.textContent = error.message;
+    }
+}
+
+async function deleteAccount(event) {
+    event.preventDefault();
+    const password = document.getElementById('delete-password').value;
+    const errorDiv = document.getElementById('delete-error');
+    errorDiv.textContent = '';
+
+    if (!confirm('Are you sure you want to delete your account? This action cannot be undone and will delete all your family tree data.')) {
+        return;
+    }
+
+    try {
+        const response = await fetch(`${API_BASE}/api/auth/delete-account?password=${encodeURIComponent(password)}`, {
+            method: 'DELETE',
+            headers: {
+                'Authorization': `Bearer ${authToken}`
+            }
+        });
+
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.detail || 'Failed to delete account');
+        }
+
+        alert('Account deleted successfully');
+        logout();
+    } catch (error) {
+        errorDiv.textContent = error.message;
     }
 }

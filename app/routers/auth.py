@@ -62,3 +62,62 @@ async def login(user_data: UserLogin, db: AsyncSession = Depends(get_db)):
 @router.get("/me", response_model=UserResponse)
 async def get_current_user_info(current_user: User = Depends(get_current_user)):
     return current_user
+
+
+@router.put("/update-email")
+async def update_email(
+    new_email: str,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
+):
+    # Check if email already exists
+    result = await db.execute(select(User).where(User.email == new_email))
+    existing_user = result.scalar_one_or_none()
+    if existing_user and existing_user.id != current_user.id:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Email already registered"
+        )
+
+    current_user.email = new_email
+    await db.commit()
+    return {"message": "Email updated successfully"}
+
+
+@router.put("/update-password")
+async def update_password(
+    current_password: str,
+    new_password: str,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
+):
+    # Verify current password
+    if not verify_password(current_password, current_user.hashed_password):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Current password is incorrect"
+        )
+
+    # Update password
+    current_user.hashed_password = get_password_hash(new_password)
+    await db.commit()
+    return {"message": "Password updated successfully"}
+
+
+@router.delete("/delete-account")
+async def delete_account(
+    password: str,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
+):
+    # Verify password before deletion
+    if not verify_password(password, current_user.hashed_password):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Password is incorrect"
+        )
+
+    # Delete user (cascade will handle family members)
+    await db.delete(current_user)
+    await db.commit()
+    return {"message": "Account deleted successfully"}

@@ -3,7 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Family Tree App</title>
+    <meta name="version" content="1.1.0">
+    <title>Family Tree App v1.1.0</title>
     <link rel="stylesheet" href="/static/styles.css">
 </head>
 <body>
@@ -45,7 +46,7 @@
         <header class="app-header">
             <h1>My Family Tree</h1>
             <div class="header-actions">
-                <span id="username-display"></span>
+                <span id="username-display" class="username-link" onclick="showAccountSettings()"></span>
                 <button onclick="logout()" class="btn-logout">Logout</button>
             </div>
         </header>
@@ -172,6 +173,62 @@
                         <button type="submit" class="btn-primary">Save</button>
                     </div>
                 </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Account Settings Modal -->
+    <div id="account-settings-modal" class="modal" style="display: none;">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Account Settings</h2>
+                <button class="modal-close" onclick="closeAccountSettings()">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="settings-section">
+                    <h3>Update Email</h3>
+                    <form onsubmit="updateEmail(event)">
+                        <div class="form-group">
+                            <label>New Email</label>
+                            <input type="email" id="new-email" required>
+                        </div>
+                        <div id="email-error" class="error-message"></div>
+                        <button type="submit" class="btn-primary">Update Email</button>
+                    </form>
+                </div>
+
+                <div class="settings-section">
+                    <h3>Change Password</h3>
+                    <form onsubmit="updatePassword(event)">
+                        <div class="form-group">
+                            <label>Current Password</label>
+                            <input type="password" id="current-password" required>
+                        </div>
+                        <div class="form-group">
+                            <label>New Password</label>
+                            <input type="password" id="new-password" required minlength="6">
+                        </div>
+                        <div class="form-group">
+                            <label>Confirm New Password</label>
+                            <input type="password" id="confirm-password" required minlength="6">
+                        </div>
+                        <div id="password-error" class="error-message"></div>
+                        <button type="submit" class="btn-primary">Change Password</button>
+                    </form>
+                </div>
+
+                <div class="settings-section danger-zone">
+                    <h3>Danger Zone</h3>
+                    <p>Deleting your account is permanent and cannot be undone.</p>
+                    <form onsubmit="deleteAccount(event)">
+                        <div class="form-group">
+                            <label>Enter your password to confirm deletion</label>
+                            <input type="password" id="delete-password" required>
+                        </div>
+                        <div id="delete-error" class="error-message"></div>
+                        <button type="submit" class="btn-delete">Delete Account</button>
+                    </form>
+                </div>
             </div>
         </div>
     </div>

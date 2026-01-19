@@ -1,6 +1,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
+from fastapi.responses import RedirectResponse
 from contextlib import asynccontextmanager
 from app.database import init_db
 from app.routers import auth, family_tree
@@ -14,7 +15,7 @@ async def lifespan(app: FastAPI):
     # Shutdown: cleanup if needed
 
 
-app = FastAPI(title="Family Tree App", version="1.0.0", lifespan=lifespan)
+app = FastAPI(title="Family Tree App", version="1.1.0", lifespan=lifespan)
 
 # Configure CORS
 app.add_middleware(
@@ -31,6 +32,12 @@ app.include_router(family_tree.router)
 
 # Mount static files
 app.mount("/static", StaticFiles(directory="static"), name="static")
+
+
+@app.get("/")
+async def root():
+    """Redirect root to the main application."""
+    return RedirectResponse(url="/static/index.html")
 
 
 @app.get("/health")

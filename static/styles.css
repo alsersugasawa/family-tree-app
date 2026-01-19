@@ -119,6 +119,29 @@ body {
     align-items: center;
 }
 
+.username-link {
+    cursor: pointer;
+    padding: 8px 16px;
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 20px;
+    transition: background 0.3s, transform 0.2s;
+    font-weight: 500;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.username-link:hover {
+    background: rgba(255, 255, 255, 0.2);
+    transform: translateY(-1px);
+}
+
+.username-link::after {
+    content: '⚙';
+    font-size: 16px;
+    opacity: 0.8;
+}
+
 .btn-logout {
     padding: 8px 20px;
     background: rgba(255, 255, 255, 0.2);
@@ -519,6 +542,62 @@ body {
     margin-top: 20px;
     padding-top: 20px;
     border-top: 1px solid #e0e0e0;
+}
+
+/* Account Settings Modal */
+.modal-body {
+    padding: 20px;
+}
+
+.modal-header h2 {
+    margin: 0;
+    font-size: 22px;
+}
+
+.modal-close {
+    background: none;
+    border: none;
+    color: white;
+    font-size: 28px;
+    cursor: pointer;
+    line-height: 1;
+}
+
+.settings-section {
+    padding: 20px;
+    margin-bottom: 20px;
+    border: 1px solid #e0e0e0;
+    border-radius: 8px;
+    background: #fafafa;
+}
+
+.settings-section h3 {
+    margin: 0 0 15px 0;
+    color: #333;
+    font-size: 18px;
+}
+
+.settings-section p {
+    margin-bottom: 15px;
+    color: #666;
+    font-size: 14px;
+}
+
+.settings-section:last-child {
+    margin-bottom: 0;
+}
+
+.danger-zone {
+    background: #fff5f5;
+    border-color: #fc8181;
+}
+
+.danger-zone h3 {
+    color: #c53030;
+}
+
+.danger-zone p {
+    color: #c53030;
 }
 
 /* Responsive */
