@@ -3,6 +3,8 @@ let authToken = localStorage.getItem('authToken');
 let currentUser = null;
 let familyMembers = [];
 let currentMemberId = null;
+let currentZoom = null;
+let currentSvg = null;
 
 // API base URL
 const API_BASE = '';
@@ -79,8 +81,23 @@ async function handleRegister(event) {
             throw new Error(error.detail || 'Registration failed');
         }
 
-        // Auto-login after registration
-        await handleLogin(new Event('submit'));
+        // Auto-login after successful registration
+        const loginResponse = await fetch(`${API_BASE}/api/auth/login`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ username, password }),
+        });
+
+        if (!loginResponse.ok) {
+            throw new Error('Registration successful but login failed. Please login manually.');
+        }
+
+        const loginData = await loginResponse.json();
+        authToken = loginData.access_token;
+        localStorage.setItem('authToken', authToken);
+        await loadUser();
     } catch (error) {
         document.getElementById('register-error').textContent = error.message;
     }
@@ -138,6 +155,7 @@ async function loadFamilyTree() {
         }
 
         familyMembers = await response.json();
+        updateFamilySummary();
         renderFamilyTree();
     } catch (error) {
         console.error('Error loading family tree:', error);
@@ -161,59 +179,321 @@ function renderFamilyTree() {
     const width = document.getElementById('tree-svg').clientWidth;
     const height = 600;
 
-    // Create a hierarchical structure
+    // Build partner relationships (people who have children together)
+    const partnerPairs = new Map(); // Map of person ID to their partners
+    familyMembers.forEach(member => {
+        if (member.father_id && member.mother_id) {
+            const father = familyMembers.find(m => m.id === member.father_id);
+            const mother = familyMembers.find(m => m.id === member.mother_id);
+            if (father && mother) {
+                if (!partnerPairs.has(father.id)) partnerPairs.set(father.id, new Set());
+                if (!partnerPairs.has(mother.id)) partnerPairs.set(mother.id, new Set());
+                partnerPairs.get(father.id).add(mother.id);
+                partnerPairs.get(mother.id).add(father.id);
+            }
+        }
+    });
+
+    // Create a hierarchical structure - find all root members (those without parents)
     const rootMembers = familyMembers.filter(m => !m.father_id && !m.mother_id);
 
-    if (rootMembers.length === 0) {
-        // If no root, just use the first member
-        rootMembers.push(familyMembers[0]);
-    }
+    // If no clear roots, find members who aren't children of anyone
+    let actualRoots = rootMembers.length > 0 ? rootMembers : familyMembers;
 
-    // Build tree data
-    const treeData = buildTreeHierarchy(rootMembers[0]);
+    // Create a global set to track processed children across all branches
+    const globalProcessedChildren = new Set();
 
-    const treeLayout = d3.tree().size([width - 100, height - 100]);
+    // Create a virtual root to hold all root members
+    const treeData = {
+        id: 'virtual-root',
+        first_name: '',
+        last_name: '',
+        isVirtual: true,
+        children: actualRoots.map(rootMember => buildTreeHierarchy(rootMember, new Set(), globalProcessedChildren))
+    };
+
+    const treeLayout = d3.tree().size([width - 100, height - 200]);
     const root = d3.hierarchy(treeData);
     treeLayout(root);
 
-    const g = svg.append('g')
-        .attr('transform', 'translate(50, 50)');
+    // Create a container group for zoom/pan
+    const container = svg.append('g');
 
-    // Draw links
-    g.selectAll('.link')
-        .data(root.links())
+    // Add zoom behavior
+    const zoom = d3.zoom()
+        .scaleExtent([0.1, 3])  // Allow zoom from 10% to 300%
+        .on('zoom', (event) => {
+            container.attr('transform', event.transform);
+        });
+
+    svg.call(zoom);
+
+    // Store zoom and svg for button controls
+    currentZoom = zoom;
+    currentSvg = svg;
+
+    // Set initial transform to center the tree
+    const initialTransform = d3.zoomIdentity.translate(50, 50);
+    svg.call(zoom.transform, initialTransform);
+
+    const g = container.append('g');
+
+    // Calculate tree base position
+    const treeBase = { x: width / 2, y: height - 100 };
+    const allNodes = root.descendants().filter(d => !d.data.isVirtual);
+
+    // Draw tree trunk
+    const trunkWidth = 60;
+    const trunkHeight = 150;
+    g.append('path')
+        .attr('class', 'tree-trunk')
+        .attr('d', `
+            M ${treeBase.x - trunkWidth/2} ${treeBase.y}
+            L ${treeBase.x - trunkWidth/2 + 5} ${treeBase.y - trunkHeight}
+            Q ${treeBase.x} ${treeBase.y - trunkHeight - 20} ${treeBase.x + trunkWidth/2 - 5} ${treeBase.y - trunkHeight}
+            L ${treeBase.x + trunkWidth/2} ${treeBase.y}
+            Z
+        `)
+        .attr('fill', '#8B4513')
+        .attr('stroke', '#654321')
+        .attr('stroke-width', 2);
+
+    // Add trunk texture with lines
+    for (let i = 0; i < 8; i++) {
+        const yPos = treeBase.y - (i * 18) - 10;
+        g.append('line')
+            .attr('x1', treeBase.x - trunkWidth/2 + 5)
+            .attr('y1', yPos)
+            .attr('x2', treeBase.x + trunkWidth/2 - 5)
+            .attr('y2', yPos)
+            .attr('stroke', '#654321')
+            .attr('stroke-width', 1)
+            .attr('opacity', 0.3);
+    }
+
+    // Draw branch links with organic curves (skip links from virtual root)
+    const links = root.links().filter(d => !d.source.data.isVirtual);
+
+    g.selectAll('.branch')
+        .data(links)
         .enter()
         .append('path')
-        .attr('class', 'link')
-        .attr('d', d3.linkVertical()
-            .x(d => d.x)
-            .y(d => d.y));
+        .attr('class', 'branch')
+        .attr('d', d => {
+            // Create curved branch paths
+            const sourceX = d.source.x;
+            const sourceY = d.source.y;
+            const targetX = d.target.x;
+            const targetY = d.target.y;
 
-    // Draw nodes
+            // Control points for bezier curve to create natural branch
+            const midY = (sourceY + targetY) / 2;
+            const cp1x = sourceX;
+            const cp1y = midY;
+            const cp2x = targetX;
+            const cp2y = midY;
+
+            return `M ${sourceX},${sourceY}
+                    C ${cp1x},${cp1y} ${cp2x},${cp2y} ${targetX},${targetY}`;
+        })
+        .attr('fill', 'none')
+        .attr('stroke', '#8B4513')
+        .attr('stroke-width', d => {
+            // Thicker branches closer to trunk
+            const depth = d.target.depth;
+            return Math.max(3, 10 - depth * 1.5);
+        });
+
+    // Draw partner/marriage links as delicate vines
+    const drawnPartners = new Set();
+    allNodes.forEach(node => {
+        if (partnerPairs.has(node.data.id)) {
+            partnerPairs.get(node.data.id).forEach(partnerId => {
+                const pairKey = [node.data.id, partnerId].sort().join('-');
+                if (!drawnPartners.has(pairKey)) {
+                    drawnPartners.add(pairKey);
+                    const partnerNode = allNodes.find(n => n.data.id === partnerId);
+                    if (partnerNode) {
+                        g.append('path')
+                            .attr('class', 'partner-vine')
+                            .attr('d', () => {
+                                const x1 = node.x;
+                                const y1 = node.y;
+                                const x2 = partnerNode.x;
+                                const y2 = partnerNode.y;
+                                const midX = (x1 + x2) / 2;
+                                const midY = (y1 + y2) / 2 - 20;
+                                return `M ${x1},${y1} Q ${midX},${midY} ${x2},${y2}`;
+                            })
+                            .attr('fill', 'none')
+                            .attr('stroke', '#ff69b4')
+                            .attr('stroke-width', 2)
+                            .attr('stroke-dasharray', '3,3')
+                            .attr('opacity', 0.6);
+                    }
+                }
+            });
+        }
+    });
+
+    // Draw nodes as leaves
     const nodes = g.selectAll('.node')
-        .data(root.descendants())
+        .data(allNodes)
         .enter()
         .append('g')
-        .attr('class', d => `node ${d.data.gender ? d.data.gender.toLowerCase() : ''}`)
+        .attr('class', d => `node leaf ${d.data.gender ? d.data.gender.toLowerCase() : ''}`)
         .attr('transform', d => `translate(${d.x},${d.y})`)
-        .on('click', (event, d) => showMemberDetails(d.data.id));
+        .on('click', (event, d) => {
+            event.stopPropagation();
+            showMemberDetails(d.data.id);
+        });
 
-    nodes.append('circle')
-        .attr('r', 25);
+    // Create leaf shapes
+    nodes.append('path')
+        .attr('class', 'leaf-shape')
+        .attr('d', 'M 0,-20 Q 15,-15 20,0 Q 15,15 0,20 Q -15,15 -20,0 Q -15,-15 0,-20 Z')
+        .attr('fill', d => {
+            if (d.data.death_date) {
+                return '#CD853F'; // Brown for deceased
+            }
+            return d.data.gender === 'Male' ? '#90EE90' : '#FFB6C1'; // Light green for male, light pink for female
+        })
+        .attr('stroke', d => {
+            if (d.data.death_date) {
+                return '#8B4513';
+            }
+            return d.data.gender === 'Male' ? '#228B22' : '#FF69B4';
+        })
+        .attr('stroke-width', 2)
+        .attr('opacity', 0.9);
 
+    // Add leaf vein (center line)
+    nodes.append('line')
+        .attr('x1', 0)
+        .attr('y1', -18)
+        .attr('x2', 0)
+        .attr('y2', 18)
+        .attr('stroke', d => d.data.death_date ? '#8B4513' : '#2F4F2F')
+        .attr('stroke-width', 1)
+        .attr('opacity', 0.4);
+
+    // Add name below leaf
     nodes.append('text')
-        .attr('dy', 40)
+        .attr('dy', 35)
         .attr('text-anchor', 'middle')
+        .attr('font-size', '11px')
+        .attr('font-weight', 'bold')
+        .attr('fill', '#2C3E50')
         .text(d => `${d.data.first_name} ${d.data.last_name}`);
+
+    // Add sibling count badge if there are siblings
+    nodes.filter(d => d.data.siblings && d.data.siblings.length > 0)
+        .append('circle')
+        .attr('class', 'sibling-badge')
+        .attr('cx', 25)
+        .attr('cy', -15)
+        .attr('r', 10)
+        .attr('fill', '#ff9800')
+        .attr('stroke', '#f57c00')
+        .attr('stroke-width', 2);
+
+    nodes.filter(d => d.data.siblings && d.data.siblings.length > 0)
+        .append('text')
+        .attr('class', 'sibling-count')
+        .attr('x', 25)
+        .attr('y', -12)
+        .attr('text-anchor', 'middle')
+        .attr('fill', 'white')
+        .attr('font-size', '9px')
+        .attr('font-weight', 'bold')
+        .text(d => `+${d.data.siblings.length}`);
 }
 
-function buildTreeHierarchy(member) {
-    const children = familyMembers.filter(m => m.father_id === member.id || m.mother_id === member.id);
+function buildTreeHierarchy(member, processedMembers = new Set(), globalProcessedChildren = new Set()) {
+    // Avoid infinite loops
+    if (processedMembers.has(member.id)) {
+        return { ...member, children: [] };
+    }
+    processedMembers.add(member.id);
+
+    // Get all children of this member
+    const allChildren = familyMembers.filter(m =>
+        (m.father_id === member.id || m.mother_id === member.id) &&
+        !globalProcessedChildren.has(m.id) // Skip if already processed globally
+    );
+
+    // Group children by their parent pairs (father_id, mother_id combination)
+    const childGroups = new Map();
+
+    allChildren.forEach(child => {
+        const parentKey = `${child.father_id || 'none'}-${child.mother_id || 'none'}`;
+        if (!childGroups.has(parentKey)) {
+            childGroups.set(parentKey, []);
+        }
+        childGroups.get(parentKey).push(child);
+    });
+
+    // For each unique parent pair, add only one representative child with siblings
+    const uniqueChildren = [];
+    childGroups.forEach((siblings) => {
+        // Mark all these children as processed globally
+        siblings.forEach(s => globalProcessedChildren.add(s.id));
+
+        // Use the first child as representative and attach siblings
+        const representative = siblings[0];
+        const childNode = buildTreeHierarchy(representative, new Set(processedMembers), globalProcessedChildren);
+
+        // Add sibling information
+        childNode.siblings = siblings.slice(1).map(s => ({
+            id: s.id,
+            first_name: s.first_name,
+            last_name: s.last_name,
+            gender: s.gender
+        }));
+
+        uniqueChildren.push(childNode);
+    });
 
     return {
         ...member,
-        children: children.map(child => buildTreeHierarchy(child))
+        children: uniqueChildren
     };
+}
+
+function updateFamilySummary() {
+    // Total members
+    const totalMembers = familyMembers.length;
+    document.getElementById('total-members').textContent = totalMembers;
+
+    // Gender counts
+    const maleCount = familyMembers.filter(m => m.gender === 'Male').length;
+    const femaleCount = familyMembers.filter(m => m.gender === 'Female').length;
+    document.getElementById('male-count').textContent = maleCount;
+    document.getElementById('female-count').textContent = femaleCount;
+
+    // Living count (those without death_date)
+    const livingCount = familyMembers.filter(m => !m.death_date).length;
+    document.getElementById('living-count').textContent = livingCount;
+
+    // Calculate generations (max depth of tree)
+    let maxGenerations = 0;
+    if (familyMembers.length > 0) {
+        const calculateDepth = (memberId, depth = 1) => {
+            const children = familyMembers.filter(m => m.father_id === memberId || m.mother_id === memberId);
+            if (children.length === 0) return depth;
+            return Math.max(...children.map(child => calculateDepth(child.id, depth + 1)));
+        };
+
+        // Find root members (those without parents)
+        const roots = familyMembers.filter(m => !m.father_id && !m.mother_id);
+        if (roots.length > 0) {
+            maxGenerations = Math.max(...roots.map(root => calculateDepth(root.id)));
+        } else {
+            // If no clear root, just count as 1 generation
+            maxGenerations = 1;
+        }
+    }
+    document.getElementById('generations-count').textContent = maxGenerations;
 }
 
 function resetTreeView() {
@@ -231,6 +511,14 @@ async function showMemberDetails(memberId) {
     const father = member.father_id ? familyMembers.find(m => m.id === member.father_id) : null;
     const mother = member.mother_id ? familyMembers.find(m => m.id === member.mother_id) : null;
     const children = familyMembers.filter(m => m.father_id === memberId || m.mother_id === memberId);
+
+    // Find siblings (same parents)
+    const siblings = familyMembers.filter(m =>
+        m.id !== memberId &&
+        m.father_id === member.father_id &&
+        m.mother_id === member.mother_id &&
+        (m.father_id || m.mother_id) // At least one parent in common
+    );
 
     detailsDiv.innerHTML = `
         <div class="detail-item">
@@ -276,6 +564,11 @@ async function showMemberDetails(memberId) {
         <div class="detail-item">
             <label>Mother</label>
             <p>${mother.first_name} ${mother.last_name}</p>
+        </div>` : ''}
+        ${siblings.length > 0 ? `
+        <div class="detail-item">
+            <label>Siblings</label>
+            <p>${siblings.map(s => `${s.first_name} ${s.last_name}`).join(', ')}</p>
         </div>` : ''}
         ${children.length > 0 ? `
         <div class="detail-item">
@@ -423,5 +716,25 @@ async function deleteMember(memberId) {
         await loadFamilyTree();
     } catch (error) {
         alert(error.message);
+    }
+}
+
+// Zoom Control Functions
+function zoomIn() {
+    if (currentZoom && currentSvg) {
+        currentSvg.transition().duration(300).call(currentZoom.scaleBy, 1.3);
+    }
+}
+
+function zoomOut() {
+    if (currentZoom && currentSvg) {
+        currentSvg.transition().duration(300).call(currentZoom.scaleBy, 0.7);
+    }
+}
+
+function resetZoom() {
+    if (currentZoom && currentSvg) {
+        const initialTransform = d3.zoomIdentity.translate(50, 50);
+        currentSvg.transition().duration(500).call(currentZoom.transform, initialTransform);
     }
 }
