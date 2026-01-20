@@ -37,6 +37,7 @@ services:
       - ./app:/app/app
       - ./static:/app/static
       - ./migrations:/app/migrations
+      - ./backups:/app/backups
     networks:
       - familytree-network
     restart: unless-stopped

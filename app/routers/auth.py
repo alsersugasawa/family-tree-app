@@ -54,6 +54,18 @@ async def login(user_data: UserLogin, db: AsyncSession = Depends(get_db)):
             headers={"WWW-Authenticate": "Bearer"},
         )
 
+    # Check if user is active
+    if not user.is_active:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Account is inactive. Please contact administrator."
+        )
+
+    # Update last login time
+    from datetime import datetime
+    user.last_login = datetime.utcnow()
+    await db.commit()
+
     # Create access token
     access_token = create_access_token(data={"sub": user.username})
     return {"access_token": access_token, "token_type": "bearer"}

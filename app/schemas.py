@@ -18,6 +18,10 @@ class UserResponse(BaseModel):
     id: int
     username: str
     email: str
+    is_admin: bool
+    is_active: bool
+    onboarding_completed: bool
+    last_login: Optional[datetime] = None
     created_at: datetime
 
     class Config:
@@ -106,3 +110,82 @@ class FamilyTreeNode(BaseModel):
 
     class Config:
         from_attributes = True
+
+# Admin Schemas
+class AdminUserCreate(BaseModel):
+    username: str
+    email: EmailStr
+    password: str
+    is_admin: bool = False
+    permissions: Optional[Dict[str, Any]] = None
+
+
+class AdminUserUpdate(BaseModel):
+    email: Optional[EmailStr] = None
+    is_admin: Optional[bool] = None
+    is_active: Optional[bool] = None
+    permissions: Optional[Dict[str, Any]] = None
+
+
+class AdminUserResponse(BaseModel):
+    id: int
+    username: str
+    email: str
+    is_admin: bool
+    is_active: bool
+    permissions: Optional[Dict[str, Any]] = None
+    last_login: Optional[datetime] = None
+    onboarding_completed: bool
+    created_at: datetime
+    updated_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+class SystemLogResponse(BaseModel):
+    id: int
+    level: str
+    message: str
+    user_id: Optional[int] = None
+    action: Optional[str] = None
+    details: Optional[Dict[str, Any]] = None
+    ip_address: Optional[str] = None
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+class BackupCreate(BaseModel):
+    backup_type: str  # "database" or "full"
+
+
+class BackupResponse(BaseModel):
+    id: int
+    filename: str
+    backup_type: str
+    file_size: Optional[int] = None
+    created_by: int
+    status: str
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+class DashboardStats(BaseModel):
+    total_users: int
+    active_users: int
+    total_family_members: int
+    total_tree_views: int
+    recent_logs: List[SystemLogResponse]
+    app_version: str
+    uptime: str
+    database_size: Optional[str] = None
+
+
+class AdminSetup(BaseModel):
+    username: str
+    email: EmailStr
+    password: str
