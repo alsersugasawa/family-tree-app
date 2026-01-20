@@ -72,6 +72,9 @@ class TreeView(Base):
     # Store filter settings as JSON: {show_deceased: bool, gender_filter: [], root_member_id: int}
     filter_settings = Column(JSON)
 
+    # Store thumbnail as base64 encoded PNG image
+    thumbnail = Column(Text, nullable=True)
+
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 

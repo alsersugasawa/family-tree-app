@@ -18,6 +18,7 @@ class TreeViewCreate(BaseModel):
     is_default: bool = False
     node_positions: Optional[dict] = None
     filter_settings: Optional[dict] = None
+    thumbnail: Optional[str] = None
 
 
 class TreeViewUpdate(BaseModel):
@@ -26,6 +27,7 @@ class TreeViewUpdate(BaseModel):
     is_default: Optional[bool] = None
     node_positions: Optional[dict] = None
     filter_settings: Optional[dict] = None
+    thumbnail: Optional[str] = None
 
 
 class TreeViewResponse(BaseModel):
@@ -35,6 +37,7 @@ class TreeViewResponse(BaseModel):
     is_default: bool
     node_positions: Optional[dict]
     filter_settings: Optional[dict]
+    thumbnail: Optional[str]
     created_at: datetime
     updated_at: datetime
 
@@ -103,7 +106,8 @@ async def create_tree_view(
         description=view_data.description,
         is_default=view_data.is_default,
         node_positions=view_data.node_positions or {},
-        filter_settings=view_data.filter_settings or {}
+        filter_settings=view_data.filter_settings or {},
+        thumbnail=view_data.thumbnail
     )
 
     db.add(new_view)
@@ -154,6 +158,8 @@ async def update_tree_view(
         view.node_positions = view_data.node_positions
     if view_data.filter_settings is not None:
         view.filter_settings = view_data.filter_settings
+    if view_data.thumbnail is not None:
+        view.thumbnail = view_data.thumbnail
 
     await db.commit()
     await db.refresh(view)

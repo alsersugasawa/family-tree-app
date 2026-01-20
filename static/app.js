@@ -178,7 +178,6 @@ function renderFamilyTree() {
     }
 
     const width = document.getElementById('tree-svg').clientWidth;
-    const height = 600;
 
     // Build partner relationships (people who have children together)
     const partnerPairs = new Map(); // Map of person ID to their partners
@@ -195,13 +194,52 @@ function renderFamilyTree() {
         }
     });
 
-    // Create a hierarchical structure - find all root members (those without parents)
+    // Calculate generation levels for each member
+    // Generation 0 = Grandparents/Great-grandparents (oldest, at top)
+    // Generation 1 = Parents
+    // Generation 2 = Children
+    // Generation 3 = Grandchildren (youngest, at bottom)
+    const generationLevels = new Map();
+    const processed = new Set();
+
+    function calculateGeneration(member, level = 0) {
+        if (processed.has(member.id)) return;
+        processed.add(member.id);
+
+        const currentLevel = generationLevels.get(member.id) || 0;
+        generationLevels.set(member.id, Math.max(currentLevel, level));
+
+        // Process children (they go one level deeper/lower)
+        familyMembers.forEach(child => {
+            if (child.father_id === member.id || child.mother_id === member.id) {
+                calculateGeneration(child, level + 1);
+            }
+        });
+    }
+
+    // Start from root members (those without parents - these are the oldest generation at the top)
     const rootMembers = familyMembers.filter(m => !m.father_id && !m.mother_id);
+    if (rootMembers.length > 0) {
+        rootMembers.forEach(root => calculateGeneration(root, 0));
+    } else {
+        // If no clear roots, find the oldest generation and start from there
+        familyMembers.forEach(member => {
+            if (!generationLevels.has(member.id)) {
+                calculateGeneration(member, 0);
+            }
+        });
+    }
 
-    // If no clear roots, find members who aren't children of anyone
+    // Calculate dynamic height based on number of generations
+    const generationGap = 180; // Vertical gap between generations (increased for better spacing)
+    const maxGeneration = Math.max(...Array.from(generationLevels.values()), 0);
+    const height = Math.max(600, (maxGeneration + 2) * generationGap + 150);
+
+    // Update SVG height dynamically
+    svg.attr('height', height);
+
+    // Create a hierarchical structure
     let actualRoots = rootMembers.length > 0 ? rootMembers : familyMembers;
-
-    // Create a global set to track processed children across all branches
     const globalProcessedChildren = new Set();
 
     // Create a virtual root to hold all root members
@@ -220,14 +258,160 @@ function renderFamilyTree() {
     // Get all nodes (exclude virtual root)
     const allNodes = root.descendants().filter(d => !d.data.isVirtual);
 
-    // Apply saved node positions if available
+    // Group nodes by generation level and apply generation-based layout
+    const generations = new Map();
+
     allNodes.forEach(node => {
-        const savedPos = currentNodePositions[node.data.id];
-        if (savedPos) {
-            node.x = savedPos.x;
-            node.y = savedPos.y;
+        const generation = generationLevels.get(node.data.id) || 0;
+        if (!generations.has(generation)) {
+            generations.set(generation, []);
         }
+        generations.get(generation).push(node);
+        node.generation = generation;
     });
+
+    // Apply saved node positions if available, otherwise use generation-based layout
+    const hasAnySavedPositions = allNodes.some(node => currentNodePositions[node.data.id]);
+
+    if (!hasAnySavedPositions) {
+        // Apply clean generation-based layout for initial view using bottom-up approach
+        const sortedGenerations = Array.from(generations.keys()).sort((a, b) => a - b);
+        const nodeSpacing = 250; // Minimum horizontal spacing between family groups (increased)
+        const siblingSpacing = 200; // Spacing between siblings (increased)
+        const partnerSpacing = 150; // Spacing between partners (increased)
+
+        // Process generations from bottom to top (children first, then parents)
+        const reversedGenerations = [...sortedGenerations].reverse();
+
+        reversedGenerations.forEach(gen => {
+            const nodesInGen = generations.get(gen);
+            const positioned = new Set();
+
+            // Group nodes by their parent pairs
+            const familyGroups = new Map(); // key: parent pair string, value: array of nodes
+
+            nodesInGen.forEach(node => {
+                const fatherId = node.data.father_id || 'none';
+                const motherId = node.data.mother_id || 'none';
+                const parentKey = [fatherId, motherId].sort().join('-');
+
+                if (!familyGroups.has(parentKey)) {
+                    familyGroups.set(parentKey, []);
+                }
+                familyGroups.get(parentKey).push(node);
+            });
+
+            // Calculate positions for each family group
+            let currentX = 200; // Start position (increased margin)
+
+            Array.from(familyGroups.values()).forEach(familyGroup => {
+                // Check if these nodes are parents (have children)
+                const haveChildren = familyGroup.some(node =>
+                    allNodes.some(n => n.data.father_id === node.data.id || n.data.mother_id === node.data.id)
+                );
+
+                if (haveChildren) {
+                    // These are parents - position them above their children
+                    familyGroup.forEach(node => {
+                        // Find their children
+                        const children = allNodes.filter(n =>
+                            n.data.father_id === node.data.id || n.data.mother_id === node.data.id
+                        );
+
+                        if (children.length > 0 && children[0].x !== undefined) {
+                            // Position above children's center
+                            const childXPositions = children.map(c => c.x).filter(x => x !== undefined);
+                            const childCenterX = childXPositions.reduce((a, b) => a + b, 0) / childXPositions.length;
+
+                            // Check if this person has a partner
+                            if (partnerPairs.has(node.data.id)) {
+                                const partners = Array.from(partnerPairs.get(node.data.id));
+                                const partnerInGroup = familyGroup.find(n =>
+                                    partners.includes(n.data.id) && !positioned.has(n.data.id)
+                                );
+
+                                if (partnerInGroup) {
+                                    // Position partners on either side of children's center
+                                    node.x = childCenterX - partnerSpacing / 2;
+                                    partnerInGroup.x = childCenterX + partnerSpacing / 2;
+                                    positioned.add(partnerInGroup.data.id);
+                                } else {
+                                    node.x = childCenterX;
+                                }
+                            } else {
+                                node.x = childCenterX;
+                            }
+                        } else {
+                            // No positioned children yet, use sequential positioning
+                            node.x = currentX;
+                            currentX += siblingSpacing;
+                        }
+
+                        node.y = 80 + (gen * generationGap);
+                        positioned.add(node.data.id);
+                    });
+                } else {
+                    // These are leaf nodes (no children) - position them sequentially
+                    familyGroup.forEach((node) => {
+                        if (!positioned.has(node.data.id)) {
+                            // Check if this person has a partner in the same family group
+                            if (partnerPairs.has(node.data.id)) {
+                                const partners = Array.from(partnerPairs.get(node.data.id));
+                                const partnerInGroup = familyGroup.find(n =>
+                                    partners.includes(n.data.id) && !positioned.has(n.data.id)
+                                );
+
+                                if (partnerInGroup) {
+                                    // Position partners together
+                                    node.x = currentX;
+                                    partnerInGroup.x = currentX + partnerSpacing;
+                                    currentX += partnerSpacing + siblingSpacing;
+                                    positioned.add(partnerInGroup.data.id);
+                                } else {
+                                    node.x = currentX;
+                                    currentX += siblingSpacing;
+                                }
+                            } else {
+                                node.x = currentX;
+                                currentX += siblingSpacing;
+                            }
+
+                            node.y = 80 + (gen * generationGap);
+                            positioned.add(node.data.id);
+                        }
+                    });
+                }
+
+                // Add spacing before next family group
+                currentX += nodeSpacing;
+            });
+        });
+
+        // Adjust positions to center the entire tree
+        if (allNodes.length > 0) {
+            const minX = Math.min(...allNodes.map(n => n.x));
+            const maxX = Math.max(...allNodes.map(n => n.x));
+            const treeWidth = maxX - minX;
+            const offset = (width - treeWidth) / 2 - minX;
+
+            allNodes.forEach(node => {
+                node.x += offset;
+            });
+        }
+    } else {
+        // Apply saved positions, but still align to generation Y coordinates
+        allNodes.forEach(node => {
+            const savedPos = currentNodePositions[node.data.id];
+            if (savedPos) {
+                node.x = savedPos.x;
+                node.y = savedPos.y;
+            } else {
+                // For unsaved positions, align to generation level
+                const generation = generationLevels.get(node.data.id) || 0;
+                node.y = 80 + (generation * generationGap);
+            }
+        });
+    }
 
     // Create a container group for zoom/pan
     const container = svg.append('g');
@@ -1163,6 +1347,88 @@ function cancelCreateView() {
     document.getElementById('create-view-form').style.display = 'none';
 }
 
+// Function to generate thumbnail of current tree view
+async function generateThumbnail() {
+    return new Promise((resolve) => {
+        try {
+            const svg = document.getElementById('tree-svg');
+            if (!svg || familyMembers.length === 0) {
+                resolve(null);
+                return;
+            }
+
+            // Clone the SVG
+            const svgClone = svg.cloneNode(true);
+
+            // Embed styles
+            const style = document.createElementNS('http://www.w3.org/2000/svg', 'style');
+            style.textContent = `
+                .node circle { fill: #667eea; stroke: #5568d3; stroke-width: 2px; }
+                .node.male circle { fill: #3498db; }
+                .node.female circle { fill: #e91e63; }
+                .node text { font-size: 12px; fill: #333; font-family: 'Segoe UI', sans-serif; }
+                .link { fill: none; stroke: #999; stroke-width: 2px; }
+                .partner-link { stroke: #ff69b4; stroke-width: 3px; stroke-dasharray: 5,5; opacity: 0.8; }
+            `;
+            svgClone.insertBefore(style, svgClone.firstChild);
+
+            // Get SVG dimensions
+            const bbox = svg.getBBox();
+            const svgWidth = Math.max(bbox.width + bbox.x + 100, 800);
+            const svgHeight = Math.max(bbox.height + bbox.y + 100, 600);
+
+            svgClone.setAttribute('width', svgWidth);
+            svgClone.setAttribute('height', svgHeight);
+            svgClone.setAttribute('xmlns', 'http://www.w3.org/2000/svg');
+
+            // Convert to string
+            const svgString = new XMLSerializer().serializeToString(svgClone);
+            const svgBlob = new Blob([svgString], { type: 'image/svg+xml;charset=utf-8' });
+            const url = URL.createObjectURL(svgBlob);
+
+            // Create canvas for thumbnail
+            const canvas = document.createElement('canvas');
+            const thumbnailWidth = 300;
+            const thumbnailHeight = 200;
+            canvas.width = thumbnailWidth;
+            canvas.height = thumbnailHeight;
+            const ctx = canvas.getContext('2d');
+
+            // Draw white background
+            ctx.fillStyle = 'white';
+            ctx.fillRect(0, 0, thumbnailWidth, thumbnailHeight);
+
+            // Load and draw SVG
+            const img = new Image();
+            img.onload = () => {
+                // Calculate scaling to fit thumbnail
+                const scale = Math.min(thumbnailWidth / svgWidth, thumbnailHeight / svgHeight) * 0.9;
+                const scaledWidth = svgWidth * scale;
+                const scaledHeight = svgHeight * scale;
+                const x = (thumbnailWidth - scaledWidth) / 2;
+                const y = (thumbnailHeight - scaledHeight) / 2;
+
+                ctx.drawImage(img, x, y, scaledWidth, scaledHeight);
+
+                // Convert to base64 PNG
+                const thumbnail = canvas.toDataURL('image/png');
+                URL.revokeObjectURL(url);
+                resolve(thumbnail);
+            };
+
+            img.onerror = () => {
+                URL.revokeObjectURL(url);
+                resolve(null);
+            };
+
+            img.src = url;
+        } catch (error) {
+            console.error('Error generating thumbnail:', error);
+            resolve(null);
+        }
+    });
+}
+
 async function createView() {
     const name = document.getElementById('new-view-name').value.trim();
     const description = document.getElementById('new-view-description').value.trim();
@@ -1177,6 +1443,9 @@ async function createView() {
     }
 
     try {
+        // Generate thumbnail
+        const thumbnail = await generateThumbnail();
+
         const response = await fetch(`${API_BASE}/api/tree-views/`, {
             method: 'POST',
             headers: {
@@ -1188,7 +1457,8 @@ async function createView() {
                 description: description || null,
                 is_default: isDefault,
                 node_positions: currentNodePositions,
-                filter_settings: {}
+                filter_settings: {},
+                thumbnail
             })
         });
 
@@ -1212,6 +1482,9 @@ async function saveCurrentView() {
     }
 
     try {
+        // Generate thumbnail
+        const thumbnail = await generateThumbnail();
+
         const response = await fetch(`${API_BASE}/api/tree-views/${currentTreeView.id}`, {
             method: 'PUT',
             headers: {
@@ -1219,13 +1492,18 @@ async function saveCurrentView() {
                 'Authorization': `Bearer ${authToken}`
             },
             body: JSON.stringify({
-                node_positions: currentNodePositions
+                node_positions: currentNodePositions,
+                thumbnail
             })
         });
 
         if (!response.ok) {
             throw new Error('Failed to save view');
         }
+
+        // Update local view with new thumbnail
+        await loadTreeViews();
+        loadViewsList();
 
         alert('View saved successfully!');
     } catch (error) {
@@ -1243,12 +1521,18 @@ function loadViewsList() {
 
     listDiv.innerHTML = treeViews.map(view => `
         <div style="padding: 15px; margin-bottom: 10px; border: 1px solid #e0e0e0; border-radius: 5px; background: ${view.is_default ? '#f0f7ff' : 'white'};">
-            <div style="display: flex; justify-content: space-between; align-items: start;">
+            <div style="display: flex; gap: 15px; align-items: start;">
+                ${view.thumbnail ? `
+                    <div style="flex-shrink: 0;">
+                        <img src="${view.thumbnail}" alt="${view.name} thumbnail"
+                             style="width: 120px; height: 80px; object-fit: cover; border-radius: 5px; border: 1px solid #ddd;">
+                    </div>
+                ` : ''}
                 <div style="flex: 1;">
                     <h4 style="margin: 0 0 5px 0;">${view.name} ${view.is_default ? '<span style="color: #667eea; font-size: 12px;">(Default)</span>' : ''}</h4>
                     ${view.description ? `<p style="margin: 0; color: #666; font-size: 13px;">${view.description}</p>` : ''}
                 </div>
-                <div style="display: flex; gap: 5px;">
+                <div style="display: flex; gap: 5px; flex-shrink: 0;">
                     <button onclick="setDefaultView(${view.id})" class="btn-icon" title="Set as Default">⭐</button>
                     <button onclick="deleteView(${view.id})" class="btn-icon" title="Delete" style="color: #e74c3c;">🗑</button>
                 </div>

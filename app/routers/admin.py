@@ -19,7 +19,7 @@ from app.auth import (
 
 router = APIRouter(prefix="/api/admin", tags=["admin"])
 
-APP_VERSION = "2.0.0"
+APP_VERSION = "2.0.1"
 START_TIME = datetime.utcnow()
 
 
