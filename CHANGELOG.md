@@ -5,6 +5,67 @@ All notable changes to the Family Tree App will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.2.0] - 2026-01-19
+
+### Added - Highlight Descendants Feature
+- **Highlight Descendants Toggle**
+  - Checkbox control to enable/disable highlight mode
+  - Dropdown selector to choose any family member
+  - Visual highlighting of selected person and all their descendants
+  - Dimming effect (opacity 0.2) on non-descendant nodes
+  - Gold border with drop shadow on selected person
+  - Red highlighted connections (3px width) for descendant relationships
+  - Automatic population of person selector with all family members
+
+### Added - Export Highlighted Views
+- **Export Highlighted PDF**
+  - Export highlighted descendant view as PDF document
+  - Filename includes selected person's name (e.g., `family_tree_John_Smith_descendants.pdf`)
+  - Preserves all highlighting effects in exported document
+  - Dedicated export button with PDF icon
+
+- **Export Highlighted JPEG**
+  - Export highlighted descendant view as JPEG image
+  - Filename includes selected person's name (e.g., `family_tree_John_Smith_descendants.jpeg`)
+  - Preserves all highlighting effects in exported image
+  - Dedicated export button with image icon
+
+### Added - Visual Enhancement
+- **Bootstrap Icons Integration**
+  - PDF export button with `bi-file-pdf` icon
+  - JPEG export button with `bi-file-image` icon
+  - Professional icon-based UI controls
+
+### Technical Details
+- **Recursive Descendant Algorithm**
+  - `highlightDescendants()` function traverses family tree recursively
+  - Finds all descendants by checking father_id and mother_id relationships
+  - Stores descendants in Set for O(1) lookup performance
+
+- **D3.js Styling Effects**
+  - Dynamic opacity manipulation for nodes and links
+  - Stroke color and width changes for visual emphasis
+  - CSS filter effects for gold border glow
+  - Real-time visual updates on selection change
+
+- **Export Functions**
+  - `exportHighlightedPDF()` - Captures current highlighted state
+  - `exportHighlightedJPEG()` - Captures current highlighted state
+  - Person name extraction from familyMembers array
+  - Safe filename generation with underscore replacement
+
+### Changed
+- Application version updated from 2.1.0 to 2.2.0
+- Controls section expanded with highlight feature UI
+- Export functionality enhanced with person-specific filenames
+
+### UI/UX Improvements
+- Highlight controls styled with inline flexbox layout
+- Disabled state for person selector when highlight mode is off
+- Disabled state for export buttons until person is selected
+- Clear visual feedback for highlighted vs. non-highlighted elements
+- Intuitive checkbox and dropdown interaction flow
+
 ## [2.1.0] - 2026-01-19
 
 ### Added - UI/UX Enhancements

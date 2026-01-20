@@ -1846,3 +1846,279 @@ async function exportToJPEG() {
         }
     }
 }
+
+// Highlight Descendants Feature
+let highlightMode = false;
+let highlightedPerson = null;
+let highlightedDescendants = new Set();
+
+function toggleHighlightMode(enabled) {
+    highlightMode = enabled;
+    const personSelect = document.getElementById('highlight-person-select');
+    const exportPdfBtn = document.getElementById('export-highlight-pdf');
+    const exportJpegBtn = document.getElementById('export-highlight-jpeg');
+
+    if (enabled) {
+        // Enable controls
+        personSelect.disabled = false;
+
+        // Populate person select with all family members
+        personSelect.innerHTML = '<option value="">Select person...</option>';
+        familyMembers
+            .sort((a, b) => `${a.first_name} ${a.last_name}`.localeCompare(`${b.first_name} ${b.last_name}`))
+            .forEach(member => {
+                const option = document.createElement('option');
+                option.value = member.id;
+                option.textContent = `${member.first_name} ${member.last_name}`;
+                personSelect.appendChild(option);
+            });
+    } else {
+        // Disable controls and clear highlighting
+        personSelect.disabled = true;
+        exportPdfBtn.disabled = true;
+        exportJpegBtn.disabled = true;
+        highlightedPerson = null;
+        highlightedDescendants.clear();
+        personSelect.value = '';
+
+        // Reset all nodes and links to normal state
+        resetHighlighting();
+    }
+}
+
+function highlightDescendants(personId) {
+    if (!personId) {
+        resetHighlighting();
+        highlightedPerson = null;
+        highlightedDescendants.clear();
+        document.getElementById('export-highlight-pdf').disabled = true;
+        document.getElementById('export-highlight-jpeg').disabled = true;
+        return;
+    }
+
+    highlightedPerson = parseInt(personId);
+    highlightedDescendants = new Set();
+
+    // Find all descendants recursively
+    function findDescendants(memberId) {
+        highlightedDescendants.add(memberId);
+        familyMembers.forEach(member => {
+            if ((member.father_id === memberId || member.mother_id === memberId) &&
+                !highlightedDescendants.has(member.id)) {
+                findDescendants(member.id);
+            }
+        });
+    }
+
+    findDescendants(highlightedPerson);
+
+    // Apply highlighting to the tree
+    applyHighlighting();
+
+    // Enable export buttons
+    document.getElementById('export-highlight-pdf').disabled = false;
+    document.getElementById('export-highlight-jpeg').disabled = false;
+}
+
+function applyHighlighting() {
+    const svg = d3.select('#tree-svg');
+
+    // Dim all nodes first
+    svg.selectAll('.node')
+        .style('opacity', d => highlightedDescendants.has(d.data.id) ? 1 : 0.2);
+
+    // Dim all links
+    svg.selectAll('.link')
+        .style('opacity', d => {
+            return highlightedDescendants.has(d.target.data.id) ? 1 : 0.1;
+        })
+        .style('stroke', d => {
+            return highlightedDescendants.has(d.target.data.id) ? '#ff6b6b' : '#999';
+        })
+        .style('stroke-width', d => {
+            return highlightedDescendants.has(d.target.data.id) ? '3px' : '2px';
+        });
+
+    // Dim partner links
+    svg.selectAll('.partner-link')
+        .style('opacity', 0.1);
+
+    // Highlight the selected person with a special border
+    svg.selectAll('.node')
+        .filter(d => d.data.id === highlightedPerson)
+        .select('circle')
+        .style('stroke', '#ffd700')
+        .style('stroke-width', '4px')
+        .style('filter', 'drop-shadow(0 0 8px rgba(255, 215, 0, 0.8))');
+}
+
+function resetHighlighting() {
+    const svg = d3.select('#tree-svg');
+
+    // Reset all nodes
+    svg.selectAll('.node')
+        .style('opacity', 1)
+        .select('circle')
+        .style('stroke', null)
+        .style('stroke-width', null)
+        .style('filter', null);
+
+    // Reset all links
+    svg.selectAll('.link')
+        .style('opacity', 1)
+        .style('stroke', '#999')
+        .style('stroke-width', '2px');
+
+    // Reset partner links
+    svg.selectAll('.partner-link')
+        .style('opacity', 0.8);
+}
+
+async function exportHighlightedPDF() {
+    if (!highlightedPerson || highlightedDescendants.size === 0) {
+        alert('Please select a person to highlight first');
+        return;
+    }
+
+    try {
+        const button = document.getElementById('export-highlight-pdf');
+        const originalText = button.innerHTML;
+        button.innerHTML = '<i class="bi bi-hourglass-split"></i>';
+        button.disabled = true;
+
+        // Get prepared SVG with embedded styles
+        const { svgString, width, height } = prepareSVGForExport();
+
+        // Create canvas
+        const canvas = document.createElement('canvas');
+        const scale = 2; // Higher resolution
+        canvas.width = width * scale;
+        canvas.height = height * scale;
+        const ctx = canvas.getContext('2d');
+        ctx.scale(scale, scale);
+
+        // White background
+        ctx.fillStyle = 'white';
+        ctx.fillRect(0, 0, width, height);
+
+        // Create blob and load image
+        const blob = new Blob([svgString], { type: 'image/svg+xml;charset=utf-8' });
+        const url = URL.createObjectURL(blob);
+
+        const img = new Image();
+
+        img.onload = function() {
+            ctx.drawImage(img, 0, 0, width, height);
+            URL.revokeObjectURL(url);
+
+            // Create PDF
+            const { jsPDF } = window.jspdf;
+            const pdf = new jsPDF({
+                orientation: width > height ? 'landscape' : 'portrait',
+                unit: 'px',
+                format: [width, height]
+            });
+
+            const imgData = canvas.toDataURL('image/png');
+            pdf.addImage(imgData, 'PNG', 0, 0, width, height);
+
+            // Get person name for filename
+            const person = familyMembers.find(m => m.id === highlightedPerson);
+            const personName = person ? `${person.first_name}_${person.last_name}` : 'person';
+            pdf.save(`family_tree_${personName}_descendants.pdf`);
+
+            button.innerHTML = originalText;
+            button.disabled = false;
+        };
+
+        img.onerror = function() {
+            URL.revokeObjectURL(url);
+            alert('Failed to generate PDF. Please try again.');
+            button.innerHTML = originalText;
+            button.disabled = false;
+        };
+
+        img.src = url;
+
+    } catch (error) {
+        console.error('Error exporting highlighted PDF:', error);
+        alert('Failed to export PDF: ' + error.message);
+        const button = document.getElementById('export-highlight-pdf');
+        if (button) {
+            button.innerHTML = '<i class="bi bi-file-pdf"></i>';
+            button.disabled = false;
+        }
+    }
+}
+
+async function exportHighlightedJPEG() {
+    if (!highlightedPerson || highlightedDescendants.size === 0) {
+        alert('Please select a person to highlight first');
+        return;
+    }
+
+    try {
+        const button = document.getElementById('export-highlight-jpeg');
+        const originalText = button.innerHTML;
+        button.innerHTML = '<i class="bi bi-hourglass-split"></i>';
+        button.disabled = true;
+
+        // Get prepared SVG with embedded styles
+        const { svgString, width, height } = prepareSVGForExport();
+
+        // Create canvas
+        const canvas = document.createElement('canvas');
+        const scale = 2; // Higher resolution
+        canvas.width = width * scale;
+        canvas.height = height * scale;
+        const ctx = canvas.getContext('2d');
+        ctx.scale(scale, scale);
+
+        // White background
+        ctx.fillStyle = 'white';
+        ctx.fillRect(0, 0, width, height);
+
+        // Create blob and load image
+        const blob = new Blob([svgString], { type: 'image/svg+xml;charset=utf-8' });
+        const url = URL.createObjectURL(blob);
+
+        const img = new Image();
+
+        img.onload = function() {
+            ctx.drawImage(img, 0, 0, width, height);
+            URL.revokeObjectURL(url);
+
+            // Convert to JPEG
+            canvas.toBlob(function(blob) {
+                const link = document.createElement('a');
+                const person = familyMembers.find(m => m.id === highlightedPerson);
+                const personName = person ? `${person.first_name}_${person.last_name}` : 'person';
+                link.download = `family_tree_${personName}_descendants.jpg`;
+                link.href = URL.createObjectURL(blob);
+                link.click();
+                URL.revokeObjectURL(link.href);
+
+                button.innerHTML = originalText;
+                button.disabled = false;
+            }, 'image/jpeg', 0.95);
+        };
+
+        img.onerror = function() {
+            URL.revokeObjectURL(url);
+            alert('Failed to generate JPEG. Please try again.');
+            button.innerHTML = originalText;
+            button.disabled = false;
+        };
+
+        img.src = url;
+
+    } catch (error) {
+        console.error('Error exporting highlighted JPEG:', error);
+        alert('Failed to export JPEG: ' + error.message);
+        const button = document.getElementById('export-highlight-jpeg');
+        if (button) {
+            button.innerHTML = '<i class="bi bi-file-image"></i>';
+            button.disabled = false;
+        }
+    }
+}

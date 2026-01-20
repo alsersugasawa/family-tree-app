@@ -3,8 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="version" content="2.1.0">
-    <title>Family Tree App v2.1.0</title>
+    <meta name="version" content="2.2.0">
+    <title>Family Tree App v2.2.0</title>
     <!-- Bootstrap 5.3 CSS -->
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <!-- Bootstrap Icons -->
@@ -67,6 +67,20 @@
             </div>
             <button onclick="showAddMemberForm()" class="btn-primary">Add Family Member</button>
             <button onclick="resetTreeView()" class="btn-secondary">Reset View</button>
+
+            <!-- Highlight Descendants Feature -->
+            <div class="highlight-controls" style="display: inline-flex; align-items: center; gap: 10px; margin-left: 10px; padding: 5px 10px; background: #f8f9fa; border-radius: 5px; border: 1px solid #dee2e6;">
+                <label style="margin: 0; font-weight: 500;">
+                    <input type="checkbox" id="highlight-mode" onchange="toggleHighlightMode(this.checked)" style="margin-right: 5px;">
+                    Highlight Descendants
+                </label>
+                <select id="highlight-person-select" style="padding: 5px 10px; border-radius: 4px; border: 1px solid #ced4da;" disabled onchange="highlightDescendants(this.value)">
+                    <option value="">Select person...</option>
+                </select>
+                <button onclick="exportHighlightedPDF()" class="btn-icon" title="Export Highlighted PDF" id="export-highlight-pdf" disabled><i class="bi bi-file-pdf"></i></button>
+                <button onclick="exportHighlightedJPEG()" class="btn-icon" title="Export Highlighted JPEG" id="export-highlight-jpeg" disabled><i class="bi bi-file-image"></i></button>
+            </div>
+
             <button onclick="exportToCSV()" class="btn-secondary">Export CSV</button>
             <button onclick="showImportCSVModal()" class="btn-secondary">Import CSV</button>
             <button onclick="exportToPDF()" class="btn-secondary">Export PDF</button>
