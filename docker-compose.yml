@@ -37,14 +37,31 @@ services:
       - ./app:/app/app
       - ./static:/app/static
       - ./migrations:/app/migrations
-      - ./backups:/app/backups
       - ./uploads:/app/uploads
+      # Backup location on host (change to your preferred backup directory)
+      - /data/familytree-backups:/data/backups
+      # Optional: Mount SMB/NFS shares (uncomment and configure if using)
+      # - smb_backups:/mnt/smb_backups
+      # - nfs_backups:/mnt/nfs_backups
     networks:
       - familytree-network
     restart: unless-stopped
 
 volumes:
   postgres_data:
+  # Optional: Define SMB and NFS volumes (uncomment if using file shares)
+  # smb_backups:
+  #   driver: local
+  #   driver_opts:
+  #     type: cifs
+  #     o: username=${SMB_USERNAME},password=${SMB_PASSWORD},vers=3.0
+  #     device: //${SMB_HOST}/${SMB_SHARE}
+  # nfs_backups:
+  #   driver: local
+  #   driver_opts:
+  #     type: nfs
+  #     o: addr=${NFS_HOST},rw
+  #     device: ":${NFS_EXPORT}"
 
 networks:
   familytree-network:

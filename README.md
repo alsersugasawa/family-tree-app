@@ -409,6 +409,11 @@ On first run, you'll need to create an admin account:
 - Create database backups with one click
 - View all backups with sizes, dates, and status
 - Backup history tracking
+- Configurable backup locations:
+  - Local disk storage (default: `/data/backups`)
+  - SMB/CIFS file share support
+  - NFS file share support
+- Automatic backup copying to configured file shares
 
 ### Admin Security Features
 
@@ -418,6 +423,87 @@ On first run, you'll need to create an admin account:
 - IP address tracking
 - Secure password requirements
 
+## Backup Configuration
+
+### Local Disk Backups
+
+By default, backups are stored in `/data/backups` on the host machine. Configure this in `.env`:
+
+```bash
+BACKUP_DIR=/data/backups
+BACKUP_RETENTION_DAYS=30
+```
+
+Update the docker-compose.yml volume mount to your preferred location:
+
+```yaml
+volumes:
+  - /your/backup/path:/data/backups
+```
+
+### SMB/CIFS File Share (Optional)
+
+To enable automatic backup copying to an SMB share:
+
+1. **Configure in `.env`:**
+   ```bash
+   SMB_BACKUP_ENABLED=true
+   SMB_HOST=your-smb-server.local
+   SMB_SHARE=backups
+   SMB_USERNAME=backup_user
+   SMB_PASSWORD=your_secure_password
+   SMB_MOUNT_POINT=/mnt/smb_backups
+   ```
+
+2. **Uncomment in docker-compose.yml:**
+   ```yaml
+   volumes:
+     - smb_backups:/mnt/smb_backups
+
+   # Under volumes section:
+   smb_backups:
+     driver: local
+     driver_opts:
+       type: cifs
+       o: username=${SMB_USERNAME},password=${SMB_PASSWORD},vers=3.0
+       device: //${SMB_HOST}/${SMB_SHARE}
+   ```
+
+### NFS File Share (Optional)
+
+To enable automatic backup copying to an NFS share:
+
+1. **Configure in `.env`:**
+   ```bash
+   NFS_BACKUP_ENABLED=true
+   NFS_HOST=your-nfs-server.local
+   NFS_EXPORT=/exports/backups
+   NFS_MOUNT_POINT=/mnt/nfs_backups
+   ```
+
+2. **Uncomment in docker-compose.yml:**
+   ```yaml
+   volumes:
+     - nfs_backups:/mnt/nfs_backups
+
+   # Under volumes section:
+   nfs_backups:
+     driver: local
+     driver_opts:
+       type: nfs
+       o: addr=${NFS_HOST},rw
+       device: ":${NFS_EXPORT}"
+   ```
+
+### How Backups Work
+
+1. When you create a backup via the admin portal:
+   - Primary backup is saved to `BACKUP_DIR` (default: `/data/backups`)
+   - If SMB is enabled and mounted, a copy is sent to the SMB share
+   - If NFS is enabled and mounted, a copy is sent to the NFS share
+2. Backup status and file share destinations are logged in system logs
+3. All backups are tracked in the database with metadata
+
 ## Security Notes
 
 ### Production Checklist
@@ -426,7 +512,8 @@ On first run, you'll need to create an admin account:
 - **Enable HTTPS** in production (use nginx/traefik reverse proxy)
 - **Update CORS settings** in `app/main.py` (restrict origins)
 - **Set environment variables** securely (never commit .env to git)
-- **Regular backups** - schedule automatic database backups
+- **Configure backup locations** - use dedicated backup storage
+- **Enable file shares** - redundant backups to SMB/NFS if available
 - **Monitor system logs** - check admin portal regularly
 - **Update dependencies** - run `pip list --outdated` periodically
 

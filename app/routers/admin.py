@@ -6,6 +6,8 @@ from datetime import datetime, timedelta
 import os
 import subprocess
 import psutil
+import shutil
+from pathlib import Path
 from app.database import get_db
 from app.models import User, SystemLog, Backup, FamilyMember, TreeView, FamilyTree, TreeShare
 from app.schemas import (
@@ -16,6 +18,7 @@ from app.schemas import (
 from app.auth import (
     get_current_admin_user, get_password_hash, check_first_run
 )
+from app.config import backup_settings
 
 router = APIRouter(prefix="/api/admin", tags=["admin"])
 
@@ -416,6 +419,31 @@ async def list_backups(
     return backups
 
 
+def copy_to_file_shares(filepath: str, filename: str) -> List[str]:
+    """Copy backup to configured file shares (SMB and NFS)."""
+    destinations = []
+
+    # Copy to SMB share if enabled
+    if backup_settings.smb_enabled and os.path.ismount(backup_settings.smb_mount_point):
+        try:
+            smb_dest = os.path.join(backup_settings.smb_mount_point, filename)
+            shutil.copy2(filepath, smb_dest)
+            destinations.append(f"SMB: {smb_dest}")
+        except Exception as e:
+            destinations.append(f"SMB: Failed - {str(e)}")
+
+    # Copy to NFS share if enabled
+    if backup_settings.nfs_enabled and os.path.ismount(backup_settings.nfs_mount_point):
+        try:
+            nfs_dest = os.path.join(backup_settings.nfs_mount_point, filename)
+            shutil.copy2(filepath, nfs_dest)
+            destinations.append(f"NFS: {nfs_dest}")
+        except Exception as e:
+            destinations.append(f"NFS: Failed - {str(e)}")
+
+    return destinations
+
+
 @router.post("/backups", response_model=BackupResponse)
 async def create_backup(
     backup_data: BackupCreate,
@@ -423,12 +451,12 @@ async def create_backup(
     current_admin: User = Depends(get_current_admin_user),
     db: AsyncSession = Depends(get_db)
 ):
-    """Create a new backup"""
+    """Create a new backup to local disk and configured file shares"""
     timestamp = datetime.utcnow().strftime("%Y%m%d_%H%M%S")
     filename = f"backup_{backup_data.backup_type}_{timestamp}.sql"
 
-    # Create backup directory if it doesn't exist
-    backup_dir = "/app/backups"
+    # Use configured backup directory (defaults to /data/backups)
+    backup_dir = backup_settings.backup_dir
     os.makedirs(backup_dir, exist_ok=True)
     filepath = os.path.join(backup_dir, filename)
 
@@ -455,6 +483,9 @@ async def create_backup(
         # Get file size
         file_size = os.path.getsize(filepath)
 
+        # Copy to file shares if configured
+        file_share_destinations = copy_to_file_shares(filepath, filename)
+
         # Create backup record
         backup_record = Backup(
             filename=filename,
@@ -468,11 +499,19 @@ async def create_backup(
         await db.commit()
         await db.refresh(backup_record)
 
-        # Log the action
+        # Log the action with file share info
+        log_details = {
+            "backup_id": backup_record.id,
+            "file_size": file_size,
+            "primary_location": filepath
+        }
+        if file_share_destinations:
+            log_details["file_shares"] = file_share_destinations
+
         await log_action(
             db, "INFO", f"Backup created: {filename}",
             user_id=current_admin.id, action="backup_created",
-            details={"backup_id": backup_record.id, "file_size": file_size},
+            details=log_details,
             ip_address=request.client.host
         )
 
