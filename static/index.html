@@ -53,8 +53,19 @@
 
         <!-- Controls -->
         <div class="controls">
+            <div class="view-selector">
+                <label for="tree-view-select">View:</label>
+                <select id="tree-view-select" onchange="switchTreeView(this.value)">
+                    <option value="">Default View</option>
+                </select>
+                <button onclick="showManageViewsModal()" class="btn-icon" title="Manage Views">⚙</button>
+            </div>
             <button onclick="showAddMemberForm()" class="btn-primary">Add Family Member</button>
             <button onclick="resetTreeView()" class="btn-secondary">Reset View</button>
+            <button onclick="exportToCSV()" class="btn-secondary">Export CSV</button>
+            <button onclick="showImportCSVModal()" class="btn-secondary">Import CSV</button>
+            <button onclick="exportToPDF()" class="btn-secondary">Export PDF</button>
+            <button onclick="exportToJPEG()" class="btn-secondary">Export JPEG</button>
         </div>
 
         <!-- Family Summary -->
@@ -117,8 +128,18 @@
                             <input type="text" id="first-name" required>
                         </div>
                         <div class="form-group">
+                            <label>Middle Name</label>
+                            <input type="text" id="middle-name">
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
                             <label>Last Name *</label>
                             <input type="text" id="last-name" required>
+                        </div>
+                        <div class="form-group">
+                            <label>Nickname</label>
+                            <input type="text" id="nickname">
                         </div>
                     </div>
                     <div class="form-row">
@@ -150,9 +171,43 @@
                         <label>Birth Place</label>
                         <input type="text" id="birth-place">
                     </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Current Location</label>
+                            <input type="text" id="location" placeholder="City, State">
+                        </div>
+                        <div class="form-group">
+                            <label>Country</label>
+                            <input type="text" id="country">
+                        </div>
+                    </div>
                     <div class="form-group">
                         <label>Biography</label>
                         <textarea id="bio" rows="3"></textarea>
+                    </div>
+                    <div class="form-group">
+                        <label>Previous Partners</label>
+                        <input type="text" id="previous-partners" placeholder="Ex-spouse names (comma separated)">
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Facebook</label>
+                            <input type="url" id="social-facebook" placeholder="https://facebook.com/...">
+                        </div>
+                        <div class="form-group">
+                            <label>Instagram</label>
+                            <input type="url" id="social-instagram" placeholder="https://instagram.com/...">
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Twitter/X</label>
+                            <input type="url" id="social-twitter" placeholder="https://twitter.com/...">
+                        </div>
+                        <div class="form-group">
+                            <label>LinkedIn</label>
+                            <input type="url" id="social-linkedin" placeholder="https://linkedin.com/in/...">
+                        </div>
                     </div>
                     <div class="form-row">
                         <div class="form-group">
@@ -233,7 +288,49 @@
         </div>
     </div>
 
+    <!-- Manage Views Modal -->
+    <div id="manage-views-modal" class="modal" style="display: none;">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Manage Tree Views</h3>
+                <button onclick="closeManageViewsModal()" class="btn-close">&times;</button>
+            </div>
+            <div style="padding: 20px;">
+                <div style="margin-bottom: 20px;">
+                    <button onclick="showCreateViewForm()" class="btn-primary">Create New View</button>
+                    <button onclick="saveCurrentView()" class="btn-secondary">Save Current View</button>
+                </div>
+
+                <div id="views-list"></div>
+
+                <div id="create-view-form" style="display: none; margin-top: 20px; padding: 15px; border: 1px solid #e0e0e0; border-radius: 5px;">
+                    <h4>Create New View</h4>
+                    <div class="form-group">
+                        <label>View Name</label>
+                        <input type="text" id="new-view-name" placeholder="e.g., Paternal Line">
+                    </div>
+                    <div class="form-group">
+                        <label>Description</label>
+                        <textarea id="new-view-description" rows="2" placeholder="Optional description"></textarea>
+                    </div>
+                    <div class="form-group">
+                        <label>
+                            <input type="checkbox" id="new-view-default"> Set as default view
+                        </label>
+                    </div>
+                    <div id="create-view-error" class="error-message"></div>
+                    <div style="display: flex; gap: 10px; margin-top: 15px;">
+                        <button onclick="cancelCreateView()" class="btn-secondary">Cancel</button>
+                        <button onclick="createView()" class="btn-primary">Create</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <script src="https://d3js.org/d3.v7.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <script src="/static/app.js"></script>
 </body>
 </html>

@@ -4,7 +4,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.responses import RedirectResponse
 from contextlib import asynccontextmanager
 from app.database import init_db
-from app.routers import auth, family_tree
+from app.routers import auth, family_tree, tree_views
 
 
 @asynccontextmanager
@@ -29,6 +29,7 @@ app.add_middleware(
 # Include routers
 app.include_router(auth.router)
 app.include_router(family_tree.router)
+app.include_router(tree_views.router)
 
 # Mount static files
 app.mount("/static", StaticFiles(directory="static"), name="static")

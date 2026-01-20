@@ -163,6 +163,57 @@ body {
     gap: 10px;
     background: #f8f9fa;
     border-bottom: 1px solid #e0e0e0;
+    align-items: center;
+    flex-wrap: wrap;
+}
+
+.controls button:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
+.view-selector {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 15px;
+    background: white;
+    border: 1px solid #ddd;
+    border-radius: 5px;
+}
+
+.view-selector label {
+    font-size: 14px;
+    color: #666;
+    font-weight: 500;
+}
+
+.view-selector select {
+    padding: 6px 10px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    font-size: 14px;
+    cursor: pointer;
+    background: white;
+}
+
+.view-selector select:focus {
+    outline: none;
+    border-color: #667eea;
+}
+
+.btn-icon {
+    padding: 6px 10px;
+    background: #f0f0f0;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 16px;
+    transition: background 0.3s;
+}
+
+.btn-icon:hover {
+    background: #e0e0e0;
 }
 
 .btn-primary {
@@ -338,7 +389,12 @@ body {
 
 /* Tree Node Styles */
 .node {
-    cursor: pointer;
+    cursor: move;
+    cursor: grab;
+}
+
+.node:active {
+    cursor: grabbing;
 }
 
 .node circle {

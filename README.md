@@ -7,8 +7,13 @@ A full-stack web application for creating and managing interactive family trees 
 - User authentication (register/login)
 - Add, edit, and delete family members
 - Interactive tree visualization using D3.js
+- **Draggable nodes** with preserved relationships
+- **CSV export/import** for family tree data
+- **PDF and JPEG export** - save tree views as high-quality images
+- **Multiple saved views** - create and manage different tree layouts
 - Parent-child relationships tracking
 - Detailed member profiles with biography, dates, and more
+- Account settings with email/password management
 - Responsive design
 
 ## Tech Stack
@@ -16,6 +21,20 @@ A full-stack web application for creating and managing interactive family trees 
 - **Backend**: FastAPI, SQLAlchemy, PostgreSQL
 - **Frontend**: HTML, CSS, JavaScript, D3.js
 - **Authentication**: JWT tokens with bcrypt password hashing
+
+## Quick Start (Docker)
+
+The fastest way to get up and running:
+
+```bash
+# Start the application (includes PostgreSQL database)
+docker-compose up -d
+
+# Wait a few seconds for the database to initialize, then visit:
+# http://localhost:8080
+```
+
+That's it! All dependencies are included in the container.
 
 ## Prerequisites
 
@@ -160,9 +179,13 @@ The application will be available at:
 
 1. Click the "Add Family Member" button
 2. Fill in the member's details:
-   - First and Last Name (required)
+   - **First Name** (required) and **Last Name** (required)
+   - Middle Name (optional)
+   - Nickname (optional)
    - Gender, Birth Date, Death Date
-   - Birth Place, Occupation
+   - Birth Place
+   - Current Location and Country (optional)
+   - Occupation
    - Biography
    - Select Father and Mother from existing members
 3. Click "Save"
@@ -172,7 +195,24 @@ The application will be available at:
 - Click on any node in the tree to view detailed information
 - Use the "Edit" button to modify member details
 - Use the "Delete" button to remove a member (be careful!)
+- Drag nodes around to customize the tree layout
 - Click "Reset View" to refresh the tree visualization
+
+### Exporting Your Family Tree
+
+- **Export CSV**: Download all family member data as a CSV file for backup or migration
+- **Import CSV**: Import family members from a CSV file
+- **Export PDF**: Save the current tree view as a high-quality PDF document
+- **Export JPEG**: Save the current tree view as a JPEG image for sharing
+
+### Managing Multiple Views
+
+1. Click the gear icon (⚙) next to the View selector
+2. Create new views with custom names and descriptions
+3. Drag nodes to arrange the tree layout
+4. Save the view to preserve node positions
+5. Switch between different views using the View dropdown
+6. Set a view as default to load it automatically
 
 ## API Endpoints
 
@@ -180,6 +220,9 @@ The application will be available at:
 - `POST /api/auth/register` - Register new user
 - `POST /api/auth/login` - Login user
 - `GET /api/auth/me` - Get current user info
+- `PUT /api/auth/update-email` - Update user email
+- `PUT /api/auth/update-password` - Update user password
+- `DELETE /api/auth/delete-account` - Delete user account
 
 ### Family Tree
 - `GET /api/family/tree` - Get complete family tree
@@ -189,6 +232,13 @@ The application will be available at:
 - `PUT /api/family/members/{id}` - Update member
 - `DELETE /api/family/members/{id}` - Delete member
 
+### Tree Views
+- `GET /api/tree-views/` - Get all saved views
+- `POST /api/tree-views/` - Create new view
+- `GET /api/tree-views/{id}` - Get specific view
+- `PUT /api/tree-views/{id}` - Update view
+- `DELETE /api/tree-views/{id}` - Delete view
+
 ## Project Structure
 
 ```
@@ -196,16 +246,19 @@ my-web-app/
 ├── app/
 │   ├── main.py              # FastAPI application entry point
 │   ├── database.py          # Database configuration
-│   ├── models.py            # SQLAlchemy models
+│   ├── models.py            # SQLAlchemy models (User, FamilyMember, TreeView)
 │   ├── schemas.py           # Pydantic schemas
 │   ├── auth.py              # Authentication utilities
 │   └── routers/
 │       ├── auth.py          # Authentication endpoints
-│       └── family_tree.py   # Family tree endpoints
+│       ├── family_tree.py   # Family tree endpoints
+│       └── tree_views.py    # Tree views management endpoints
 ├── static/
 │   ├── index.html           # Main HTML page
 │   ├── styles.css           # CSS styling
-│   └── app.js               # Frontend JavaScript
+│   └── app.js               # Frontend JavaScript (D3.js visualization)
+├── migrations/
+│   └── 001_add_tree_views.sql  # Database migrations
 ├── Dockerfile               # Docker container configuration
 ├── docker-compose.yml       # Docker Compose orchestration
 ├── .dockerignore           # Docker build exclusions
@@ -282,11 +335,13 @@ pip install -r requirements.txt
 ## Future Enhancements
 
 - Photo upload for family members
-- Export family tree as PDF/image
 - Multiple family trees per user
 - Shared family trees with other users
 - Advanced search and filtering
 - Timeline view of family history
+- PNG export with transparent background
+- Batch editing of family members
+- Family tree statistics and analytics
 
 ## License
 
