@@ -368,13 +368,67 @@ my-web-app/
 └── README.md               # This file
 ```
 
+## Admin Portal
+
+### Accessing the Admin Portal
+
+**URL**: `http://localhost:8080/static/admin-login.html`
+
+### First-Time Setup
+
+On first run, you'll need to create an admin account:
+
+1. Visit the admin login page
+2. If no admin exists, you'll see the setup form
+3. Create your admin account with username, email, and password
+4. Log in to access the dashboard
+
+### Admin Features
+
+**Dashboard**
+- View system statistics (users, trees, members, shares, active users)
+- Monitor system resources (CPU, RAM, Disk usage) with color-coded indicators
+- View services status (Web app, Database, File storage)
+- Check app version, uptime, and system information
+- Recent activity logs preview
+
+**User Management**
+- View all users with details
+- Create new users (with admin or regular permissions)
+- Edit users (email, admin status, active/inactive)
+- Delete users (with protection - cannot delete yourself)
+- Track last login times
+
+**System Logs**
+- View all system activity
+- Filter by level (INFO, WARNING, ERROR)
+- Track actions, user, IP address, and timestamps
+- Audit trail for security and compliance
+
+**Backup Management**
+- Create database backups with one click
+- View all backups with sizes, dates, and status
+- Backup history tracking
+
+### Admin Security Features
+
+- Admin-only access with JWT token authentication
+- Self-protection (admins cannot delete or deactivate themselves)
+- Activity logging for audit trails
+- IP address tracking
+- Secure password requirements
+
 ## Security Notes
 
-- Change the `SECRET_KEY` in `app/auth.py` for production use
-- Use strong passwords for your database
-- Enable HTTPS in production
-- Update CORS settings in `app/main.py` for production
-- Store sensitive credentials securely (use environment variables, never commit to git)
+### Production Checklist
+- **Change SECRET_KEY** in `app/auth.py` to a secure random value
+- **Use strong passwords** for database (update docker-compose.yml)
+- **Enable HTTPS** in production (use nginx/traefik reverse proxy)
+- **Update CORS settings** in `app/main.py` (restrict origins)
+- **Set environment variables** securely (never commit .env to git)
+- **Regular backups** - schedule automatic database backups
+- **Monitor system logs** - check admin portal regularly
+- **Update dependencies** - run `pip list --outdated` periodically
 
 ## Troubleshooting
 
@@ -414,6 +468,19 @@ docker-compose down && docker-compose up -d
 docker-compose down -v
 docker-compose up -d
 ```
+
+**Admin Portal Issues:**
+
+*"Access denied. Admin privileges required"*
+- Ensure you're logged in with an admin account
+- Check that `is_admin` flag is true in database:
+  ```bash
+  docker-compose exec db psql -U postgres -d familytree -c "SELECT username, is_admin FROM users WHERE username='your_username';"
+  ```
+
+*"Could not validate credentials"*
+- Session may have expired - log in again
+- Clear browser localStorage if issues persist
 
 ### Local Development Issues
 
