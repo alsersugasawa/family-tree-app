@@ -5,6 +5,32 @@ All notable changes to the Family Tree App will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.1.0] - 2026-01-19
+
+### Added - UI/UX Enhancements
+- **Bootstrap 5.3 Integration**
+  - Added Bootstrap 5.3 CSS and JavaScript via CDN
+  - Integrated Bootstrap Icons library (1.11.0)
+  - Modern, responsive UI framework
+  - Consistent design language across all pages
+  - Mobile-first responsive design
+
+### Changed
+- Application version updated from 2.0.1 to 2.1.0
+- All HTML pages now include Bootstrap 5.3
+  - Main application ([index.html](static/index.html))
+  - Admin login page ([admin-login.html](static/admin-login.html))
+  - Admin dashboard ([admin.html](static/admin.html))
+- Custom CSS updated to work alongside Bootstrap
+- Page titles updated to include version 2.1.0
+
+### Technical Details
+- Bootstrap 5.3.0 CDN: https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css
+- Bootstrap Icons 1.11.0: https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css
+- Bootstrap Bundle JS (includes Popper.js) for interactive components
+- Maintains backward compatibility with existing custom styles
+- All existing functionality preserved
+
 ## [2.0.1] - 2026-01-19
 
 ### Added - Tree View Enhancements

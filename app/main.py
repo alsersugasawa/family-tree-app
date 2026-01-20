@@ -15,7 +15,7 @@ async def lifespan(app: FastAPI):
     # Shutdown: cleanup if needed
 
 
-app = FastAPI(title="Family Tree App", version="2.0.1", lifespan=lifespan)
+app = FastAPI(title="Family Tree App", version="2.1.0", lifespan=lifespan)
 
 # Configure CORS
 app.add_middleware(
