@@ -5,6 +5,8 @@ let familyMembers = [];
 let currentMemberId = null;
 let currentZoom = null;
 let currentSvg = null;
+let currentTreeId = null;
+let familyTrees = [];
 
 // API base URL
 const API_BASE = '';
@@ -118,6 +120,7 @@ async function loadUser() {
         currentUser = await response.json();
         document.getElementById('username-display').textContent = currentUser.username;
         showAppContainer();
+        await loadFamilyTrees();
         await loadTreeViews();
         await loadFamilyTree();
     } catch (error) {
@@ -145,7 +148,11 @@ function showAppContainer() {
 // Family Tree Functions
 async function loadFamilyTree() {
     try {
-        const response = await fetch(`${API_BASE}/api/family/tree`, {
+        const url = currentTreeId
+            ? `${API_BASE}/api/family/tree?tree_id=${currentTreeId}`
+            : `${API_BASE}/api/family/tree`;
+
+        const response = await fetch(url, {
             headers: {
                 'Authorization': `Bearer ${authToken}`,
             },
@@ -156,6 +163,8 @@ async function loadFamilyTree() {
         }
 
         familyMembers = await response.json();
+        console.log('Loaded family members:', familyMembers);
+        console.log('Photo URLs:', familyMembers.map(m => ({ name: `${m.first_name} ${m.last_name}`, photo_url: m.photo_url })));
         updateFamilySummary();
         renderFamilyTree();
     } catch (error) {
@@ -554,13 +563,73 @@ function renderFamilyTree() {
             }
         });
 
-    nodes.append('circle')
-        .attr('r', 25);
+    // Add profile pictures or default circles
+    nodes.each(function(d) {
+        const node = d3.select(this);
+
+        // Determine border color based on gender
+        let borderColor = '#764ba2'; // Purple for 'Other' or undefined
+        if (d.data.gender === 'Male') {
+            borderColor = '#3498db'; // Blue
+        } else if (d.data.gender === 'Female') {
+            borderColor = '#e91e63'; // Pink
+        }
+
+        if (d.data.photo_url) {
+            console.log(`Rendering photo for ${d.data.first_name} ${d.data.last_name}: ${d.data.photo_url}`);
+
+            // Add white background circle
+            node.append('circle')
+                .attr('class', 'background-circle')
+                .attr('r', 25)
+                .style('fill', 'white');  // Inline style to override CSS
+
+            // Add circular clip path for the image
+            const clipId = `clip-${d.data.id}`;
+            node.append('defs')
+                .append('clipPath')
+                .attr('id', clipId)
+                .append('circle')
+                .attr('r', 25);
+
+            // Add profile picture
+            node.append('image')
+                .attr('class', 'profile-image')
+                .attr('href', d.data.photo_url)
+                .attr('xlink:href', d.data.photo_url)  // Fallback for older browsers
+                .attr('x', -25)
+                .attr('y', -25)
+                .attr('width', 50)
+                .attr('height', 50)
+                .attr('clip-path', `url(#${clipId})`)
+                .attr('preserveAspectRatio', 'xMidYMid slice')
+                .on('error', function() {
+                    console.error(`Failed to load image: ${d.data.photo_url}`);
+                });
+
+            // Add border circle over the image (with important inline styles)
+            node.append('circle')
+                .attr('class', 'border-circle')
+                .attr('r', 25)
+                .style('fill', 'none')  // Inline style to override CSS
+                .style('stroke', borderColor)
+                .style('stroke-width', '3px');
+        } else {
+            // Add default circle with gender-specific color
+            node.append('circle')
+                .attr('r', 25)
+                .attr('stroke', borderColor)
+                .attr('stroke-width', 3);
+        }
+    });
 
     nodes.append('text')
         .attr('dy', 40)
         .attr('text-anchor', 'middle')
         .text(d => `${d.data.first_name} ${d.data.last_name}`);
+
+    // Attach hover tooltip listeners to all nodes
+    attachNodeHoverListeners();
 }
 
 function buildTreeHierarchy(member, processedMembers = new Set(), globalProcessedChildren = new Set()) {
@@ -650,7 +719,14 @@ async function showMemberDetails(memberId) {
         (m.father_id || m.mother_id) // At least one parent in common
     );
 
+    console.log('Member details:', member);
+    console.log('Photo URL:', member.photo_url);
+
     detailsDiv.innerHTML = `
+        ${member.photo_url ? `
+        <div class="detail-item" style="text-align: center;">
+            <img src="${member.photo_url}" style="width: 150px; height: 150px; border-radius: 50%; object-fit: cover; border: 3px solid ${member.gender === 'Male' ? '#3498db' : member.gender === 'Female' ? '#e91e63' : '#764ba2'};" alt="Profile Picture">
+        </div>` : ''}
         <div class="detail-item">
             <label>Name</label>
             <p>${member.first_name}${member.middle_name ? ' ' + member.middle_name : ''} ${member.last_name}${member.nickname ? ' "' + member.nickname + '"' : ''}</p>
@@ -849,6 +925,7 @@ async function handleMemberSubmit(event) {
         previous_partners: document.getElementById('previous-partners').value || null,
         father_id: parseInt(document.getElementById('father-id').value) || null,
         mother_id: parseInt(document.getElementById('mother-id').value) || null,
+        tree_id: currentTreeId,
     };
 
     try {
@@ -870,6 +947,29 @@ async function handleMemberSubmit(event) {
         if (!response.ok) {
             const error = await response.json();
             throw new Error(error.detail || 'Failed to save member');
+        }
+
+        const savedMember = await response.json();
+
+        // Handle profile picture upload if file is selected
+        const fileInput = document.getElementById('profile-picture');
+        if (fileInput.files && fileInput.files[0]) {
+            const formData = new FormData();
+            formData.append('file', fileInput.files[0]);
+
+            const uploadResponse = await fetch(`${API_BASE}/api/family/members/${savedMember.id}/upload-photo`, {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${authToken}`,
+                },
+                body: formData,
+            });
+
+            if (!uploadResponse.ok) {
+                const error = await uploadResponse.json();
+                console.error('Failed to upload photo:', error.detail);
+                alert('Member saved but photo upload failed: ' + error.detail);
+            }
         }
 
         closeMemberModal();
@@ -2120,5 +2220,887 @@ async function exportHighlightedJPEG() {
             button.innerHTML = '<i class="bi bi-file-image"></i>';
             button.disabled = false;
         }
+    }
+}
+
+// ==========================================
+// HOVER TOOLTIP FUNCTIONALITY
+// ==========================================
+
+let tooltipElement = null;
+
+/**
+ * Initialize tooltip element reference
+ */
+function initializeTooltip() {
+    tooltipElement = document.getElementById('node-tooltip');
+}
+
+/**
+ * Format tooltip content for a family member
+ * @param {Object} member - Family member data
+ * @returns {string} HTML content for tooltip
+ */
+function formatTooltipContent(member) {
+    let content = `<div class="tooltip-name">${member.first_name}`;
+    
+    if (member.middle_name) {
+        content += ` ${member.middle_name}`;
+    }
+    
+    content += ` ${member.last_name}`;
+    
+    if (member.nickname) {
+        content += ` "${member.nickname}"`;
+    }
+    
+    content += '</div>';
+    
+    // Gender
+    if (member.gender) {
+        content += `<div class="tooltip-field">
+            <span class="tooltip-label">Gender:</span>
+            <span class="tooltip-value">${member.gender}</span>
+        </div>`;
+    }
+    
+    // Birth Date
+    if (member.birth_date) {
+        const birthDate = new Date(member.birth_date);
+        const formattedDate = birthDate.toLocaleDateString('en-US', { 
+            year: 'numeric', 
+            month: 'long', 
+            day: 'numeric' 
+        });
+        content += `<div class="tooltip-field">
+            <span class="tooltip-label">Born:</span>
+            <span class="tooltip-value">${formattedDate}</span>
+        </div>`;
+    }
+    
+    // Birth Place
+    if (member.birth_place) {
+        content += `<div class="tooltip-field">
+            <span class="tooltip-label">Birth Place:</span>
+            <span class="tooltip-value">${member.birth_place}</span>
+        </div>`;
+    }
+    
+    // Death Date
+    if (member.death_date) {
+        const deathDate = new Date(member.death_date);
+        const formattedDate = deathDate.toLocaleDateString('en-US', { 
+            year: 'numeric', 
+            month: 'long', 
+            day: 'numeric' 
+        });
+        content += `<div class="tooltip-field">
+            <span class="tooltip-label">Died:</span>
+            <span class="tooltip-value">${formattedDate}</span>
+        </div>`;
+    } else {
+        content += `<div class="tooltip-field">
+            <span class="tooltip-label">Status:</span>
+            <span class="tooltip-value">Living</span>
+        </div>`;
+    }
+    
+    // Occupation
+    if (member.occupation) {
+        content += `<div class="tooltip-field">
+            <span class="tooltip-label">Occupation:</span>
+            <span class="tooltip-value">${member.occupation}</span>
+        </div>`;
+    }
+    
+    // Location
+    if (member.location) {
+        let locationText = member.location;
+        if (member.country) {
+            locationText += ', ' + member.country;
+        }
+        content += `<div class="tooltip-field">
+            <span class="tooltip-label">Location:</span>
+            <span class="tooltip-value">${locationText}</span>
+        </div>`;
+    }
+    
+    // Parents
+    const father = familyMembers.find(m => m.id === member.father_id);
+    const mother = familyMembers.find(m => m.id === member.mother_id);
+    
+    if (father || mother) {
+        let parentsText = '';
+        if (father) parentsText += `${father.first_name} ${father.last_name}`;
+        if (father && mother) parentsText += ' & ';
+        if (mother) parentsText += `${mother.first_name} ${mother.last_name}`;
+        
+        content += `<div class="tooltip-field">
+            <span class="tooltip-label">Parents:</span>
+            <span class="tooltip-value">${parentsText}</span>
+        </div>`;
+    }
+    
+    // Children count
+    const children = familyMembers.filter(m => 
+        m.father_id === member.id || m.mother_id === member.id
+    );
+    
+    if (children.length > 0) {
+        content += `<div class="tooltip-field">
+            <span class="tooltip-label">Children:</span>
+            <span class="tooltip-value">${children.length}</span>
+        </div>`;
+    }
+    
+    return content;
+}
+
+/**
+ * Show tooltip on mouse hover
+ * @param {Event} event - Mouse event
+ * @param {Object} member - Family member data
+ */
+function showTooltip(event, member) {
+    if (!tooltipElement) {
+        initializeTooltip();
+    }
+    
+    if (!tooltipElement) return;
+    
+    // Set tooltip content
+    tooltipElement.innerHTML = formatTooltipContent(member);
+    
+    // Position tooltip near the cursor
+    const containerRect = document.getElementById('tree-container').getBoundingClientRect();
+    const tooltipX = event.clientX - containerRect.left + 15;
+    const tooltipY = event.clientY - containerRect.top + 15;
+    
+    tooltipElement.style.left = tooltipX + 'px';
+    tooltipElement.style.top = tooltipY + 'px';
+    
+    // Show tooltip with fade-in effect
+    tooltipElement.classList.add('visible');
+}
+
+/**
+ * Hide tooltip on mouse leave
+ */
+function hideTooltip() {
+    if (!tooltipElement) return;
+    
+    // Hide tooltip with fade-out effect
+    tooltipElement.classList.remove('visible');
+}
+
+/**
+ * Update tooltip position as mouse moves
+ * @param {Event} event - Mouse event
+ */
+function moveTooltip(event) {
+    if (!tooltipElement || !tooltipElement.classList.contains('visible')) return;
+    
+    const containerRect = document.getElementById('tree-container').getBoundingClientRect();
+    const tooltipX = event.clientX - containerRect.left + 15;
+    const tooltipY = event.clientY - containerRect.top + 15;
+    
+    tooltipElement.style.left = tooltipX + 'px';
+    tooltipElement.style.top = tooltipY + 'px';
+}
+
+/**
+ * Attach hover event listeners to nodes
+ * Called after nodes are rendered in the tree
+ */
+function attachNodeHoverListeners() {
+    const nodes = d3.selectAll('.node');
+    
+    nodes
+        .on('mouseenter', function(event, d) {
+            showTooltip(event, d.data);
+        })
+        .on('mousemove', function(event) {
+            moveTooltip(event);
+        })
+        .on('mouseleave', function() {
+            hideTooltip();
+        });
+}
+
+// Initialize tooltip on page load
+document.addEventListener('DOMContentLoaded', function() {
+    initializeTooltip();
+});
+
+// Profile picture preview
+document.addEventListener('DOMContentLoaded', function() {
+    const fileInput = document.getElementById('profile-picture');
+    if (fileInput) {
+        fileInput.addEventListener('change', function(e) {
+            const file = e.target.files[0];
+            if (file) {
+                // Validate file size
+                if (file.size > 5 * 1024 * 1024) {
+                    alert('File size exceeds 5MB limit');
+                    e.target.value = '';
+                    return;
+                }
+
+                // Show preview
+                const reader = new FileReader();
+                reader.onload = function(event) {
+                    const previewDiv = document.getElementById('photo-preview');
+                    const previewImg = document.getElementById('photo-preview-img');
+                    previewImg.src = event.target.result;
+                    previewDiv.style.display = 'block';
+                };
+                reader.readAsDataURL(file);
+            }
+        });
+    }
+});
+
+// ============================================================================
+// Multi-Tree Management Functions
+// ============================================================================
+
+/**
+ * Load all family trees for the current user
+ */
+async function loadFamilyTrees() {
+    try {
+        const response = await fetch(`${API_BASE}/api/trees/`, {
+            headers: {
+                'Authorization': `Bearer ${authToken}`,
+            },
+        });
+
+        if (!response.ok) {
+            throw new Error('Failed to load family trees');
+        }
+
+        familyTrees = await response.json();
+
+        // Set current tree to default or first tree
+        if (!currentTreeId && familyTrees.length > 0) {
+            const defaultTree = familyTrees.find(t => t.is_default) || familyTrees[0];
+            currentTreeId = defaultTree.id;
+        }
+
+        updateTreeSelector();
+        await loadPendingSharesCount();
+    } catch (error) {
+        console.error('Error loading family trees:', error);
+    }
+}
+
+/**
+ * Update the tree selector dropdown with available trees
+ */
+function updateTreeSelector() {
+    const selector = document.getElementById('family-tree-select');
+    if (!selector) return;
+
+    selector.innerHTML = '';
+
+    if (familyTrees.length === 0) {
+        selector.innerHTML = '<option value="">No trees available</option>';
+        return;
+    }
+
+    familyTrees.forEach(tree => {
+        const option = document.createElement('option');
+        option.value = tree.id;
+        option.textContent = `${tree.name} (${tree.member_count} members)`;
+        if (tree.id === currentTreeId) {
+            option.selected = true;
+        }
+        selector.appendChild(option);
+    });
+}
+
+/**
+ * Switch to a different family tree
+ */
+async function switchFamilyTree(treeId) {
+    currentTreeId = parseInt(treeId);
+    await loadFamilyTree();
+}
+
+/**
+ * Show the tree management modal
+ */
+function showTreeManagementModal() {
+    document.getElementById('tree-management-modal').style.display = 'flex';
+    loadTreesList();
+}
+
+/**
+ * Close the tree management modal
+ */
+function closeTreeManagementModal() {
+    document.getElementById('tree-management-modal').style.display = 'none';
+    document.getElementById('create-tree-form').style.display = 'none';
+}
+
+/**
+ * Show the create tree form
+ */
+function showCreateTreeForm() {
+    document.getElementById('create-tree-form').style.display = 'block';
+}
+
+/**
+ * Cancel tree creation
+ */
+function cancelCreateTree() {
+    document.getElementById('create-tree-form').style.display = 'none';
+    document.getElementById('new-tree-name').value = '';
+    document.getElementById('new-tree-description').value = '';
+    document.getElementById('new-tree-default').checked = false;
+}
+
+/**
+ * Create a new family tree
+ */
+async function createTree() {
+    const name = document.getElementById('new-tree-name').value.trim();
+    const description = document.getElementById('new-tree-description').value.trim();
+    const isDefault = document.getElementById('new-tree-default').checked;
+    const errorDiv = document.getElementById('create-tree-error');
+
+    errorDiv.textContent = '';
+
+    if (!name) {
+        errorDiv.textContent = 'Please enter a tree name';
+        return;
+    }
+
+    try {
+        const response = await fetch(`${API_BASE}/api/trees/`, {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${authToken}`,
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                name,
+                description: description || null,
+                is_default: isDefault,
+            }),
+        });
+
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.detail || 'Failed to create tree');
+        }
+
+        const newTree = await response.json();
+
+        cancelCreateTree();
+        await loadFamilyTrees();
+        loadTreesList();
+
+        // Switch to the new tree
+        currentTreeId = newTree.id;
+        await loadFamilyTree();
+        updateTreeSelector();
+
+        alert('Tree created successfully!');
+    } catch (error) {
+        console.error('Error creating tree:', error);
+        errorDiv.textContent = 'Error: ' + error.message;
+    }
+}
+
+/**
+ * Load and display the list of trees in the management modal
+ */
+async function loadTreesList() {
+    const container = document.getElementById('trees-list');
+    if (!container) return;
+
+    container.innerHTML = '<p>Loading trees...</p>';
+
+    try {
+        await loadFamilyTrees();
+
+        // Update the "Save Current as New Tree" button state
+        const saveCurrentBtn = document.getElementById('save-current-tree-btn');
+        if (saveCurrentBtn) {
+            const currentTree = familyTrees.find(t => t.id === currentTreeId);
+            if (!currentTreeId || !currentTree || currentTree.member_count === 0) {
+                saveCurrentBtn.disabled = true;
+                saveCurrentBtn.style.opacity = '0.5';
+                saveCurrentBtn.title = 'No members in current tree to save';
+            } else {
+                saveCurrentBtn.disabled = false;
+                saveCurrentBtn.style.opacity = '1';
+                saveCurrentBtn.title = `Save a copy of "${currentTree.name}" with all ${currentTree.member_count} members`;
+            }
+        }
+
+        if (familyTrees.length === 0) {
+            container.innerHTML = '<p>No family trees yet. Create your first tree!</p>';
+            return;
+        }
+
+        container.innerHTML = '';
+
+        familyTrees.forEach(tree => {
+            const treeCard = document.createElement('div');
+            treeCard.className = 'tree-card';
+
+            const ownerText = tree.user_id === currentUser.id ? 'Owner' : 'Shared';
+            const defaultBadge = tree.is_default ? '<span class="badge bg-primary ms-2">Default</span>' : '';
+
+            treeCard.innerHTML = `
+                <div class="tree-card-header">
+                    <h5>${tree.name} ${defaultBadge}</h5>
+                    <span class="text-muted">${ownerText}</span>
+                </div>
+                <p class="tree-card-description">${tree.description || 'No description'}</p>
+                <div class="tree-card-stats">
+                    <span><i class="bi bi-people"></i> ${tree.member_count} members</span>
+                    <span><i class="bi bi-calendar"></i> ${new Date(tree.created_at).toLocaleDateString()}</span>
+                </div>
+                <div class="tree-card-actions">
+                    ${tree.user_id === currentUser.id ? `
+                        <button onclick="showRenameModal(${tree.id})" class="btn btn-sm btn-outline-secondary">
+                            <i class="bi bi-pencil"></i> Rename
+                        </button>
+                        <button onclick="copyTree(${tree.id})" class="btn btn-sm btn-outline-primary">
+                            <i class="bi bi-files"></i> Copy
+                        </button>
+                        <button onclick="showShareModal(${tree.id})" class="btn btn-sm btn-outline-success">
+                            <i class="bi bi-share"></i> Share
+                        </button>
+                        <button onclick="deleteTree(${tree.id})" class="btn btn-sm btn-outline-danger">
+                            <i class="bi bi-trash"></i> Delete
+                        </button>
+                    ` : ''}
+                </div>
+            `;
+
+            container.appendChild(treeCard);
+        });
+    } catch (error) {
+        container.innerHTML = '<p class="text-danger">Error loading trees</p>';
+    }
+}
+
+/**
+ * Save current tree as a new tree (copy current tree)
+ */
+async function saveCurrentTreeAs() {
+    if (!currentTreeId) {
+        alert('No tree is currently selected');
+        return;
+    }
+
+    const currentTree = familyTrees.find(t => t.id === currentTreeId);
+    if (!currentTree) {
+        alert('Current tree not found');
+        return;
+    }
+
+    const newName = prompt(`Enter a name for the new tree (current: "${currentTree.name}"):`, `${currentTree.name} (Copy)`);
+    if (!newName || !newName.trim()) return;
+
+    try {
+        const response = await fetch(`${API_BASE}/api/trees/${currentTreeId}/copy?new_name=${encodeURIComponent(newName.trim())}`, {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${authToken}`,
+            },
+        });
+
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.detail || 'Failed to save tree');
+        }
+
+        const newTree = await response.json();
+
+        await loadFamilyTrees();
+        loadTreesList();
+
+        // Switch to the new tree
+        currentTreeId = newTree.id;
+        await loadFamilyTree();
+        updateTreeSelector();
+
+        alert('Tree saved successfully!');
+    } catch (error) {
+        alert('Error saving tree: ' + error.message);
+    }
+}
+
+/**
+ * Copy a family tree
+ */
+async function copyTree(treeId) {
+    const tree = familyTrees.find(t => t.id === treeId);
+    if (!tree) return;
+
+    const newName = prompt(`Enter a name for the copy of "${tree.name}":`, `${tree.name} (Copy)`);
+    if (!newName || !newName.trim()) return;
+
+    try {
+        const response = await fetch(`${API_BASE}/api/trees/${treeId}/copy?new_name=${encodeURIComponent(newName.trim())}`, {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${authToken}`,
+            },
+        });
+
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.detail || 'Failed to copy tree');
+        }
+
+        await loadFamilyTrees();
+        loadTreesList();
+        alert('Tree copied successfully!');
+    } catch (error) {
+        alert('Error copying tree: ' + error.message);
+    }
+}
+
+/**
+ * Delete a family tree
+ */
+async function deleteTree(treeId) {
+    const tree = familyTrees.find(t => t.id === treeId);
+    if (!tree) return;
+
+    const confirmMessage = `Are you sure you want to delete "${tree.name}"?\n\nThis will permanently delete the tree and all ${tree.member_count} members. This action cannot be undone.`;
+
+    if (!confirm(confirmMessage)) return;
+
+    try {
+        const response = await fetch(`${API_BASE}/api/trees/${treeId}`, {
+            method: 'DELETE',
+            headers: {
+                'Authorization': `Bearer ${authToken}`,
+            },
+        });
+
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.detail || 'Failed to delete tree');
+        }
+
+        // If we deleted the current tree, switch to another one
+        if (currentTreeId === treeId) {
+            currentTreeId = null;
+        }
+
+        await loadFamilyTrees();
+        loadTreesList();
+
+        // Reload the family tree display
+        if (currentTreeId) {
+            await loadFamilyTree();
+        }
+
+        alert('Tree deleted successfully');
+    } catch (error) {
+        alert('Error deleting tree: ' + error.message);
+    }
+}
+
+/**
+ * Show the share tree modal
+ */
+function showShareModal(treeId) {
+    document.getElementById('share-tree-modal').style.display = 'flex';
+    document.getElementById('share-tree-modal').dataset.treeId = treeId;
+    document.getElementById('share-username').value = '';
+    document.getElementById('share-permission').value = 'view';
+}
+
+/**
+ * Close the share tree modal
+ */
+function closeShareTreeModal() {
+    document.getElementById('share-tree-modal').style.display = 'none';
+    delete document.getElementById('share-tree-modal').dataset.treeId;
+}
+
+/**
+ * Share a tree with another user
+ */
+async function shareTree(event) {
+    event.preventDefault();
+
+    const treeId = document.getElementById('share-tree-modal').dataset.treeId;
+    const username = document.getElementById('share-username').value.trim();
+    const permission = document.getElementById('share-permission').value;
+
+    if (!username) {
+        alert('Please enter a username');
+        return;
+    }
+
+    try {
+        const response = await fetch(`${API_BASE}/api/trees/${treeId}/share`, {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${authToken}`,
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                tree_id: parseInt(treeId),
+                shared_with_username: username,
+                permission_level: permission,
+            }),
+        });
+
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.detail || 'Failed to share tree');
+        }
+
+        closeShareTreeModal();
+        alert(`Tree shared successfully with ${username}!`);
+    } catch (error) {
+        alert('Error sharing tree: ' + error.message);
+    }
+}
+
+/**
+ * Load pending share invitations count
+ */
+async function loadPendingSharesCount() {
+    try {
+        const response = await fetch(`${API_BASE}/api/trees/shares/pending`, {
+            headers: {
+                'Authorization': `Bearer ${authToken}`,
+            },
+        });
+
+        if (!response.ok) return;
+
+        const shares = await response.json();
+        const badge = document.getElementById('pending-shares-badge');
+
+        if (shares.length > 0) {
+            badge.textContent = shares.length;
+            badge.style.display = 'inline-block';
+        } else {
+            badge.style.display = 'none';
+        }
+    } catch (error) {
+        console.error('Error loading pending shares count:', error);
+    }
+}
+
+/**
+ * Show pending share invitations modal
+ */
+async function showPendingShares() {
+    document.getElementById('pending-shares-modal').style.display = 'flex';
+    await loadPendingSharesList();
+}
+
+/**
+ * Close pending shares modal
+ */
+function closePendingSharesModal() {
+    document.getElementById('pending-shares-modal').style.display = 'none';
+}
+
+/**
+ * Load and display pending share invitations
+ */
+async function loadPendingSharesList() {
+    const container = document.getElementById('pending-shares-list');
+    if (!container) return;
+
+    container.innerHTML = '<p>Loading pending shares...</p>';
+
+    try {
+        const response = await fetch(`${API_BASE}/api/trees/shares/pending`, {
+            headers: {
+                'Authorization': `Bearer ${authToken}`,
+            },
+        });
+
+        if (!response.ok) {
+            throw new Error('Failed to load pending shares');
+        }
+
+        const shares = await response.json();
+
+        if (shares.length === 0) {
+            container.innerHTML = '<p>No pending share invitations</p>';
+            return;
+        }
+
+        container.innerHTML = '';
+
+        shares.forEach(share => {
+            const shareCard = document.createElement('div');
+            shareCard.className = 'share-card';
+
+            shareCard.innerHTML = `
+                <div class="share-card-header">
+                    <h5>${share.tree_name}</h5>
+                    <span class="badge bg-info">${share.permission_level}</span>
+                </div>
+                <p class="share-card-info">
+                    Shared by <strong>${share.shared_by_username}</strong>
+                    <br>
+                    <small class="text-muted">${new Date(share.created_at).toLocaleString()}</small>
+                </p>
+                <div class="share-card-actions">
+                    <button onclick="acceptShare(${share.id})" class="btn btn-sm btn-success">
+                        <i class="bi bi-check-circle"></i> Accept
+                    </button>
+                    <button onclick="declineShare(${share.id})" class="btn btn-sm btn-danger">
+                        <i class="bi bi-x-circle"></i> Decline
+                    </button>
+                </div>
+            `;
+
+            container.appendChild(shareCard);
+        });
+    } catch (error) {
+        container.innerHTML = '<p class="text-danger">Error loading pending shares</p>';
+    }
+}
+
+/**
+ * Accept a share invitation
+ */
+async function acceptShare(shareId) {
+    try {
+        const response = await fetch(`${API_BASE}/api/trees/shares/${shareId}/accept`, {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${authToken}`,
+            },
+        });
+
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.detail || 'Failed to accept share');
+        }
+
+        await loadFamilyTrees();
+        await loadPendingSharesList();
+        await loadPendingSharesCount();
+        alert('Share accepted! The tree is now available in your tree list.');
+    } catch (error) {
+        alert('Error accepting share: ' + error.message);
+    }
+}
+
+/**
+ * Decline a share invitation
+ */
+async function declineShare(shareId) {
+    if (!confirm('Are you sure you want to decline this invitation?')) return;
+
+    try {
+        const response = await fetch(`${API_BASE}/api/trees/shares/${shareId}`, {
+            method: 'DELETE',
+            headers: {
+                'Authorization': `Bearer ${authToken}`,
+            },
+        });
+
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.detail || 'Failed to decline share');
+        }
+
+        await loadPendingSharesList();
+        await loadPendingSharesCount();
+        alert('Share invitation declined');
+    } catch (error) {
+        alert('Error declining share: ' + error.message);
+    }
+}
+
+// ============================================================================
+// Tree Rename/Edit Functions
+// ============================================================================
+
+/**
+ * Show the rename tree modal
+ */
+function showRenameModal(treeId) {
+    const tree = familyTrees.find(t => t.id === treeId);
+    if (!tree) return;
+
+    const modal = document.getElementById('rename-tree-modal');
+    modal.style.display = 'flex';
+    modal.dataset.treeId = treeId;
+
+    document.getElementById('rename-tree-name').value = tree.name;
+    document.getElementById('rename-tree-description').value = tree.description || '';
+    document.getElementById('rename-error').textContent = '';
+}
+
+/**
+ * Close the rename tree modal
+ */
+function closeRenameTreeModal() {
+    const modal = document.getElementById('rename-tree-modal');
+    modal.style.display = 'none';
+    delete modal.dataset.treeId;
+    document.getElementById('rename-tree-name').value = '';
+    document.getElementById('rename-tree-description').value = '';
+    document.getElementById('rename-error').textContent = '';
+}
+
+/**
+ * Rename/update a tree
+ */
+async function renameTree(event) {
+    event.preventDefault();
+
+    const modal = document.getElementById('rename-tree-modal');
+    const treeId = modal.dataset.treeId;
+    const name = document.getElementById('rename-tree-name').value.trim();
+    const description = document.getElementById('rename-tree-description').value.trim();
+    const errorDiv = document.getElementById('rename-error');
+
+    errorDiv.textContent = '';
+
+    if (!name) {
+        errorDiv.textContent = 'Please enter a tree name';
+        return;
+    }
+
+    try {
+        const response = await fetch(`${API_BASE}/api/trees/${treeId}`, {
+            method: 'PUT',
+            headers: {
+                'Authorization': `Bearer ${authToken}`,
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                name,
+                description: description || null,
+            }),
+        });
+
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.detail || 'Failed to update tree');
+        }
+
+        closeRenameTreeModal();
+        await loadFamilyTrees();
+        loadTreesList();
+        updateTreeSelector();
+
+        alert('Tree updated successfully!');
+    } catch (error) {
+        console.error('Error updating tree:', error);
+        errorDiv.textContent = 'Error: ' + error.message;
     }
 }

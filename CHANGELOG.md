@@ -5,6 +5,351 @@ All notable changes to the Family Tree App will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.0.0] - 2026-01-20
+
+### Added - Multi-Tree Management System
+- **Multiple Family Trees Per User**
+  - Create unlimited family trees per user account
+  - Each tree with custom name and description
+  - Tree selector dropdown in header for quick switching
+  - One default tree per user (automatically created)
+  - Active/inactive tree status management
+
+- **Tree Management Interface**
+  - Tree management modal with comprehensive controls
+  - Create new empty trees
+  - Copy existing trees with all members and relationships
+  - Rename trees with name and description editing
+  - Delete non-default trees with confirmation
+  - Save current tree as new copy functionality
+  - Visual tree cards with member count display
+
+- **Tree Sharing Features**
+  - Share trees with other users via username
+  - Permission levels: "view" (read-only) or "edit" (full access)
+  - Share invitation system with accept/decline workflow
+  - Pending shares notification badge in header
+  - Shared trees accessible from tree selector
+  - Track who shared each tree
+  - Revoke shares and manage permissions
+
+- **New Database Infrastructure**
+  - `family_trees` table: Store multiple trees per user
+  - `tree_shares` table: Many-to-many user sharing relationships
+  - `tree_id` foreign key on `family_members` table
+  - Migration 006: Multi-tree schema creation
+  - Migration 007: Data migration and cleanup
+  - Indexes on user_id, tree_id, and share relationships
+
+- **Multi-Tree API Endpoints** ([app/routers/family_trees.py](app/routers/family_trees.py))
+  - `GET /api/trees/` - List all trees for current user
+  - `POST /api/trees/` - Create new tree
+  - `GET /api/trees/{id}` - Get tree details
+  - `PUT /api/trees/{id}` - Update tree name/description
+  - `DELETE /api/trees/{id}` - Delete tree
+  - `POST /api/trees/{id}/copy` - Copy tree with new name
+  - `POST /api/trees/{id}/share` - Share tree with user
+  - `GET /api/trees/shared` - List trees shared with current user
+  - `GET /api/trees/pending-shares` - List pending share invitations
+  - `POST /api/trees/shares/{id}/accept` - Accept share invitation
+  - `POST /api/trees/shares/{id}/decline` - Decline share invitation
+
+### Added - Profile Picture Upload System
+- **Image Upload Feature**
+  - Upload profile pictures for family members
+  - File upload via member details modal
+  - Supported formats: JPEG, PNG, GIF, WebP
+  - Maximum file size: 5MB
+  - Server-side validation and processing
+
+- **Image Storage**
+  - Dedicated uploads directory (`/uploads/profile_pictures/`)
+  - UUID-based unique filenames to prevent conflicts
+  - Original file extension preservation
+  - Docker volume mount for persistent storage
+  - Automatic directory creation on startup
+
+- **Visual Enhancements**
+  - Profile pictures displayed on tree nodes (40x40px circular)
+  - Gender-specific colored borders around profile pictures:
+    - Blue border for male members
+    - Pink border for female members
+    - Gray border for other/unspecified gender
+  - Fallback to colored circles when no picture uploaded
+  - Consistent visual styling across tree view
+
+- **Upload API Endpoint** ([app/routers/family_tree.py](app/routers/family_tree.py))
+  - `POST /api/family-members/{id}/upload-picture` - Upload profile picture
+  - File validation (type, size)
+  - Secure file handling
+  - Database URL update
+
+### Added - Tree Node Tooltips
+- **Hover Information Display**
+  - Tooltips appear on node hover
+  - Display member's full name
+  - Show birth and death dates (if available)
+  - "Living" indicator for members without death date
+  - Smooth fade-in/fade-out transitions (200ms)
+  - Positioned above tree nodes
+  - Dark semi-transparent background for readability
+
+### Added - Enhanced Admin Dashboard
+- **Expanded Dashboard Statistics**
+  - **Active Users Metric**: Users who logged in within last 30 days
+  - **Family Trees Count**: Total trees across all users
+  - **Tree Shares Count**: Total sharing relationships
+  - Original metrics: Total users, family members, saved views
+  - All metrics displayed as prominent stat cards
+
+- **System Resources Monitoring Card**
+  - **CPU Metrics**:
+    - CPU usage percentage with color-coding
+    - CPU speed in MHz
+    - Number of CPU cores
+  - **RAM Metrics**:
+    - Memory usage percentage with color-coding
+    - Total RAM in GB (2 decimal precision)
+    - Available RAM in GB
+  - **Disk Metrics**:
+    - Disk usage percentage with color-coding
+    - Total disk space in GB
+    - Available disk space in GB
+  - **Color-Coded Values**:
+    - Green: < 60% usage (healthy)
+    - Yellow: 60-80% usage (warning)
+    - Red: > 80% usage (critical)
+  - Real-time updates via psutil library
+
+- **Services Layout Overview Card**
+  - **Web Application Service**:
+    - FastAPI + uvicorn technology stack
+    - Port 8000 display
+    - Animated running status indicator
+  - **PostgreSQL Database Service**:
+    - postgres:14-alpine image info
+    - Port 5432 display
+    - Health check status
+  - **File Storage Service**:
+    - Static files and uploads indicator
+    - Service availability status
+  - **Animated Status Indicators**:
+    - Pulsing green dots for running services
+    - Red dots for stopped services
+    - Smooth 2-second pulse animation
+
+- **System Information Card**
+  - Python version display
+  - Platform/OS information
+  - System architecture (ARM/x86)
+  - Application uptime tracking
+
+- **Enhanced Dashboard Endpoint** ([app/routers/admin.py](app/routers/admin.py))
+  - Active user calculation with 30-day window
+  - Family tree and share count aggregation
+  - psutil integration for system metrics
+  - CPU frequency and core count retrieval
+  - Memory statistics (total, available, percent)
+  - Disk usage statistics (total, free, percent)
+  - Python and platform information
+
+- **Updated Admin Schemas** ([app/schemas.py](app/schemas.py))
+  - `DashboardStats` model expanded with:
+    - `active_users`, `total_family_trees`, `total_tree_shares`
+    - `cpu_percent`, `cpu_cores`, `cpu_speed`
+    - `memory_percent`, `memory_total`, `memory_available`
+    - `disk_percent`, `disk_total`, `disk_available`
+    - `python_version`, `platform`, `architecture`
+
+- **Admin Dashboard Styles** ([static/admin-styles.css](static/admin-styles.css))
+  - Service status indicator styles
+  - Pulse animation keyframes
+  - Resource value color classes (good/warning/danger)
+  - Responsive service layout grid
+
+### Changed
+- Application version updated from 2.2.0 to 3.0.0 across all files
+- Family member operations now scoped to specific tree_id
+- Tree selector integrated into main application header
+- Member creation/editing includes tree assignment
+- Admin dashboard redesigned with 4 comprehensive cards
+- System monitoring now uses real-time metrics
+- Docker health check includes psutil availability
+
+### Fixed - Data Migration & Stability
+- **NULL Timestamp Validation Error**
+  - Issue: ResponseValidationError for created_at/updated_at on tree creation
+  - Root cause: SQLAlchemy defaults not applied before response serialization
+  - Fix: Explicit timestamp assignment in tree creation endpoint ([app/routers/family_trees.py](app/routers/family_trees.py):109-115)
+
+- **SQLAlchemy Relationship Ambiguity**
+  - Issue: App crash with "can't determine join condition" error
+  - Root cause: Multiple foreign keys to User model without explicit specification
+  - Fix: Added `foreign_keys` parameter to User.shared_trees relationship ([app/models.py](app/models.py):25)
+
+- **Multi-Tree Data Migration**
+  - Issue: 82 existing family members not showing after migration
+  - Root cause: NULL tree_id on members, NULL timestamps on default tree
+  - Fix: Migration 007 ([migrations/007_fix_multi_tree_data.sql](migrations/007_fix_multi_tree_data.sql))
+    - Fixed NULL timestamps on family_trees
+    - Assigned orphaned members to default trees
+    - Deleted empty duplicate trees
+    - Added verification query
+
+### Database Migrations
+- **Migration 006** ([migrations/006_add_family_trees.sql](migrations/006_add_family_trees.sql))
+  - Created `family_trees` table with user ownership
+  - Created `tree_shares` table for sharing functionality
+  - Added `tree_id` column to `family_members`
+  - Created performance indexes
+  - Migrated existing data to default trees
+
+- **Migration 007** ([migrations/007_fix_multi_tree_data.sql](migrations/007_fix_multi_tree_data.sql))
+  - Fixed NULL timestamp issues
+  - Reassigned orphaned members
+  - Cleaned up duplicate empty trees
+  - Added data verification queries
+
+### Technical Details
+- **Multi-Tree JavaScript Functions** ([static/app.js](static/app.js):2463-2947)
+  - `loadFamilyTrees()` - Fetch and cache user's trees
+  - `updateTreeSelector()` - Populate tree dropdown
+  - `switchFamilyTree(treeId)` - Switch active tree
+  - `showTreeManagementModal()` - Display tree management UI
+  - `createTree(event)` - Create new tree
+  - `loadTreesList()` - Populate tree cards in modal
+  - `copyTree(treeId)` - Duplicate tree with members
+  - `deleteTree(treeId)` - Delete tree with confirmation
+  - `saveCurrentTreeAs()` - Save copy of current tree
+  - `showRenameModal(treeId)` - Display rename dialog
+  - `renameTree(event)` - Update tree name/description
+  - `showShareModal(treeId)` - Display sharing dialog
+  - `shareTree(event)` - Create share invitation
+  - `loadPendingShares()` - Fetch pending invitations
+  - `loadPendingSharesCount()` - Update badge count
+  - `acceptShare(shareId)` - Accept invitation
+  - `declineShare(shareId)` - Reject invitation
+
+- **Profile Picture Upload** ([static/app.js](static/app.js))
+  - File input change handler
+  - FormData multipart upload
+  - Image preview on successful upload
+  - Tree visualization update with new picture
+  - Gender-specific border styling
+
+- **Tooltip Implementation** ([static/app.js](static/app.js))
+  - D3.js mouseover/mouseout event handlers
+  - Dynamic tooltip positioning
+  - Date formatting for birth/death display
+  - Conditional "Living" status display
+
+- **Admin Dashboard JavaScript** ([static/admin.js](static/admin.js):95-136, 469-520)
+  - `updateResourceValue()` - Color-code resource metrics
+  - `updateServiceStatus()` - Update service indicators
+  - `checkDatabaseStatus()` - Health check via /health endpoint
+  - `checkFileStorageStatus()` - Verify static file access
+  - Real-time metric updates on dashboard load
+
+### Dependencies
+- **Existing Dependencies** (no new additions)
+  - fastapi==0.115.0
+  - uvicorn[standard]==0.32.0
+  - pydantic==2.9.0
+  - sqlalchemy==2.0.23
+  - asyncpg==0.29.0
+  - psutil==5.9.8 (already added in v2.0.0)
+  - All other dependencies unchanged
+
+### Containerization
+- **Docker Configuration Verified**
+  - Dockerfile: Python 3.11-slim base image
+  - Multi-stage build with dependency caching
+  - Non-root user (appuser) for security
+  - Health check with 30s interval
+  - Uploads directory creation
+
+- **Docker Compose Configuration**
+  - PostgreSQL 14 Alpine database service
+  - FastAPI web application service
+  - Volume mounts for development:
+    - `./app:/app/app` - Application code
+    - `./static:/app/static` - Frontend assets
+    - `./migrations:/app/migrations` - Database migrations
+    - `./backups:/app/backups` - Backup storage
+    - `./uploads:/app/uploads` - Profile pictures
+  - Persistent postgres_data volume
+  - Service health checks
+  - Network isolation (familytree-network)
+  - Port mappings: 8080:8000 (web), 5432:5432 (db)
+
+### UI/UX Improvements
+- Tree selector dropdown for quick tree switching
+- Notification badge for pending share invitations
+- Visual tree management modal with card layout
+- Member count display on tree cards
+- Disable controls for empty trees
+- Profile picture file input in member modal
+- Gender-specific visual styling
+- Hover tooltips for contextual information
+- Admin dashboard with real-time system monitoring
+- Color-coded resource indicators for quick status assessment
+- Animated service status for visual feedback
+
+### Security
+- Tree ownership validation on all tree operations
+- Share permission enforcement (view vs edit)
+- User can only share trees they own
+- File upload validation (type, size)
+- Secure file storage with UUID filenames
+- SQL injection protection via ORM relationships
+- Cascade deletion prevents orphaned shares
+
+### Breaking Changes
+- Family member API now requires `tree_id` parameter for creation
+- Existing family members migrated to user's default tree
+- Multi-tree architecture changes database schema
+- Frontend now requires tree selection before displaying members
+
+### Migration Guide - Upgrading to 3.0.0 from 2.x
+1. **Pull latest changes from repository**
+   ```bash
+   git pull origin main
+   ```
+
+2. **Run database migrations**
+   ```bash
+   # Migration 006: Add multi-tree support
+   cat migrations/006_add_family_trees.sql | docker-compose exec -T db psql -U postgres -d familytree
+
+   # Migration 007: Fix multi-tree data issues
+   cat migrations/007_fix_multi_tree_data.sql | docker-compose exec -T db psql -U postgres -d familytree
+   ```
+
+3. **Rebuild and restart containers**
+   ```bash
+   docker-compose down
+   docker-compose up -d --build
+   ```
+
+4. **Verify migration**
+   - Log in to your account
+   - Verify "My Family Tree" (default) contains all your members
+   - Test tree creation, sharing, and switching functionality
+   - Upload a profile picture to test image upload
+   - Hover over nodes to see tooltips
+
+5. **Admin Dashboard Updates**
+   - Access admin portal at http://localhost:8080/static/admin-login.html
+   - Verify new metrics: Active Users, Family Trees, Tree Shares
+   - Check System Resources card shows CPU, RAM, Disk metrics
+   - Confirm Services Layout card displays all services
+
+### Known Issues
+- Web container health check shows "unhealthy" but application is functional
+  - Cause: Health check requires requests library not in requirements.txt
+  - Impact: No functional impact, can be ignored
+  - Workaround: Add `requests` to requirements.txt if health check needed
+
 ## [2.2.0] - 2026-01-19
 
 ### Added - Highlight Descendants Feature

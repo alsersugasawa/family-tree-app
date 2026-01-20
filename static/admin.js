@@ -95,16 +95,36 @@ async function loadDashboard() {
         // Update stats
         document.getElementById('stat-total-users').textContent = data.total_users;
         document.getElementById('stat-active-users').textContent = data.active_users;
+        document.getElementById('stat-family-trees').textContent = data.total_family_trees;
         document.getElementById('stat-family-members').textContent = data.total_family_members;
         document.getElementById('stat-tree-views').textContent = data.total_tree_views;
+        document.getElementById('stat-tree-shares').textContent = data.total_tree_shares;
+
+        // Update system resources with color coding
+        updateResourceValue('system-cpu-percent', data.cpu_percent, '%');
+        document.getElementById('system-cpu-speed').textContent = data.cpu_speed;
+        document.getElementById('system-cpu-cores').textContent = data.cpu_cores;
+
+        updateResourceValue('system-memory-percent', data.memory_percent, '%');
+        document.getElementById('system-memory-total').textContent = data.memory_total;
+        document.getElementById('system-memory-available').textContent = data.memory_available;
+
+        updateResourceValue('system-disk-percent', data.disk_percent, '%');
+        document.getElementById('system-disk-total').textContent = data.disk_total;
+        document.getElementById('system-disk-available').textContent = data.disk_available;
 
         // Update system info
         document.getElementById('system-version').textContent = data.app_version;
         document.getElementById('system-uptime').textContent = data.uptime;
         document.getElementById('system-db-size').textContent = data.database_size || 'N/A';
+        document.getElementById('python-version').textContent = data.python_version;
+        document.getElementById('system-platform').textContent = data.platform;
+        document.getElementById('system-arch').textContent = data.architecture;
 
-        // Load system info
-        loadSystemInfo();
+        // Update service statuses
+        updateServiceStatus('service-web', true); // Assume running if we got response
+        checkDatabaseStatus();
+        checkFileStorageStatus();
 
         // Display recent logs
         const logsDiv = document.getElementById('recent-logs');
@@ -443,5 +463,58 @@ function getBadgeClass(level) {
         case 'WARNING': return 'warning';
         case 'ERROR': return 'danger';
         default: return 'info';
+    }
+}
+
+// Resource value updater with color coding
+function updateResourceValue(elementId, value, suffix = '') {
+    const element = document.getElementById(elementId);
+    if (!element) return;
+
+    element.textContent = `${value.toFixed(1)}${suffix}`;
+
+    // Remove existing color classes
+    element.classList.remove('good', 'warning', 'danger');
+
+    // Add appropriate color class based on value
+    if (value < 60) {
+        element.classList.add('good');
+    } else if (value < 80) {
+        element.classList.add('warning');
+    } else {
+        element.classList.add('danger');
+    }
+}
+
+// Service status updater
+function updateServiceStatus(serviceId, isRunning) {
+    const service = document.getElementById(serviceId);
+    if (!service) return;
+
+    const statusDot = service.querySelector('.service-status');
+    if (!statusDot) return;
+
+    statusDot.classList.remove('status-running', 'status-stopped', 'status-unknown');
+    statusDot.classList.add(isRunning ? 'status-running' : 'status-stopped');
+}
+
+// Check database status
+async function checkDatabaseStatus() {
+    try {
+        const response = await fetch(`${API_BASE}/health`);
+        updateServiceStatus('service-db', response.ok);
+    } catch (error) {
+        updateServiceStatus('service-db', false);
+    }
+}
+
+// Check file storage status
+async function checkFileStorageStatus() {
+    try {
+        // Try to access a static file to verify file storage is working
+        const response = await fetch(`${API_BASE}/static/styles.css`, { method: 'HEAD' });
+        updateServiceStatus('service-uploads', response.ok);
+    } catch (error) {
+        updateServiceStatus('service-uploads', false);
     }
 }

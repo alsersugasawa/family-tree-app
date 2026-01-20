@@ -49,7 +49,21 @@
     <div id="app-container" class="app-container" style="display: none;">
         <!-- Header -->
         <header class="app-header">
-            <h1>My Family Tree</h1>
+            <div class="header-left">
+                <h1>Family Tree</h1>
+                <div class="tree-selector-header">
+                    <select id="family-tree-select" onchange="switchFamilyTree(this.value)" class="tree-dropdown">
+                        <option value="">Loading trees...</option>
+                    </select>
+                    <button onclick="showTreeManagementModal()" class="btn-icon" title="Manage Trees">
+                        <i class="bi bi-gear"></i>
+                    </button>
+                    <button onclick="showPendingShares()" class="btn-icon" title="Pending Shares" id="shares-btn" style="position: relative;">
+                        <i class="bi bi-share"></i>
+                        <span id="pending-shares-badge" class="badge-notification" style="display: none;">0</span>
+                    </button>
+                </div>
+            </div>
             <div class="header-actions">
                 <span id="username-display" class="username-link" onclick="showAccountSettings()"></span>
                 <button onclick="logout()" class="btn-logout">Logout</button>
@@ -122,6 +136,8 @@
                 <button onclick="zoomOut()" class="zoom-btn" title="Zoom Out">−</button>
                 <button onclick="resetZoom()" class="zoom-btn" title="Reset Zoom">⟲</button>
             </div>
+            <!-- Hover Tooltip -->
+            <div id="node-tooltip" class="node-tooltip"></div>
         </div>
 
         <!-- Member Details Panel -->
@@ -207,6 +223,14 @@
                     <div class="form-group">
                         <label>Previous Partners</label>
                         <input type="text" id="previous-partners" placeholder="Ex-spouse names (comma separated)">
+                    </div>
+                    <div class="form-group">
+                        <label>Profile Picture</label>
+                        <input type="file" id="profile-picture" accept="image/jpeg,image/jpg,image/png,image/gif,image/webp">
+                        <small style="color: #666; font-size: 12px;">Max file size: 5MB. Supported formats: JPEG, PNG, GIF, WebP</small>
+                        <div id="photo-preview" style="margin-top: 10px; display: none;">
+                            <img id="photo-preview-img" src="" style="max-width: 150px; max-height: 150px; border-radius: 50%; object-fit: cover; border: 3px solid #667eea;">
+                        </div>
                     </div>
                     <div class="form-row">
                         <div class="form-group">
@@ -343,6 +367,127 @@
                         <button onclick="createView()" class="btn-primary">Create</button>
                     </div>
                 </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Tree Management Modal -->
+    <div id="tree-management-modal" class="modal" style="display: none;">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Manage Family Trees</h3>
+                <button onclick="closeTreeManagementModal()" class="btn-close">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div style="margin-bottom: 20px; display: flex; gap: 10px; flex-wrap: wrap;">
+                    <button onclick="showCreateTreeForm()" class="btn-primary">
+                        <i class="bi bi-plus-circle"></i> Create Empty Tree
+                    </button>
+                    <button onclick="saveCurrentTreeAs()" id="save-current-tree-btn" class="btn-primary" style="background: #28a745;">
+                        <i class="bi bi-save"></i> Save Current as New Tree
+                    </button>
+                </div>
+
+                <!-- Create Tree Form -->
+                <div id="create-tree-form" style="display: none; margin-bottom: 20px; padding: 15px; border: 1px solid #e0e0e0; border-radius: 5px; background: #f8f9fa;">
+                    <h4>Create New Tree</h4>
+                    <div class="form-group">
+                        <label>Tree Name *</label>
+                        <input type="text" id="new-tree-name" placeholder="e.g., Maternal Line">
+                    </div>
+                    <div class="form-group">
+                        <label>Description</label>
+                        <textarea id="new-tree-description" rows="2" placeholder="Optional description"></textarea>
+                    </div>
+                    <div class="form-group">
+                        <label>
+                            <input type="checkbox" id="new-tree-default"> Set as default tree
+                        </label>
+                    </div>
+                    <div id="create-tree-error" class="error-message"></div>
+                    <div style="display: flex; gap: 10px; margin-top: 15px;">
+                        <button onclick="cancelCreateTree()" class="btn-secondary">Cancel</button>
+                        <button onclick="createTree()" class="btn-primary">Create</button>
+                    </div>
+                </div>
+
+                <!-- Trees List -->
+                <div id="trees-list" class="trees-list">
+                    <p>Loading trees...</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Pending Shares Modal -->
+    <div id="pending-shares-modal" class="modal" style="display: none;">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Pending Share Invitations</h3>
+                <button onclick="closePendingSharesModal()" class="btn-close">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div id="pending-shares-list">
+                    <p>Loading...</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Share Tree Modal -->
+    <div id="share-tree-modal" class="modal" style="display: none;">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Share Tree</h3>
+                <button onclick="closeShareTreeModal()" class="btn-close">&times;</button>
+            </div>
+            <div class="modal-body">
+                <form onsubmit="shareTree(event)">
+                    <input type="hidden" id="share-tree-id">
+                    <div class="form-group">
+                        <label>Username *</label>
+                        <input type="text" id="share-username" required placeholder="Enter username to share with">
+                    </div>
+                    <div class="form-group">
+                        <label>Permission Level</label>
+                        <select id="share-permission">
+                            <option value="view">View Only</option>
+                            <option value="edit">Can Edit</option>
+                        </select>
+                    </div>
+                    <div id="share-error" class="error-message"></div>
+                    <div class="form-actions">
+                        <button type="button" onclick="closeShareTreeModal()" class="btn-secondary">Cancel</button>
+                        <button type="submit" class="btn-primary">Share</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Rename Tree Modal -->
+    <div id="rename-tree-modal" class="modal" style="display: none;">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Rename Tree</h3>
+                <button onclick="closeRenameTreeModal()" class="btn-close">&times;</button>
+            </div>
+            <div class="modal-body">
+                <form onsubmit="renameTree(event)">
+                    <div class="form-group">
+                        <label>Tree Name *</label>
+                        <input type="text" id="rename-tree-name" required placeholder="Enter new tree name">
+                    </div>
+                    <div class="form-group">
+                        <label>Description</label>
+                        <textarea id="rename-tree-description" rows="2" placeholder="Optional description"></textarea>
+                    </div>
+                    <div id="rename-error" class="error-message"></div>
+                    <div class="form-actions">
+                        <button type="button" onclick="closeRenameTreeModal()" class="btn-secondary">Cancel</button>
+                        <button type="submit" class="btn-primary">Save Changes</button>
+                    </div>
+                </form>
             </div>
         </div>
     </div>

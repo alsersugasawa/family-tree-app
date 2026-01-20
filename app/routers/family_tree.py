@@ -1,7 +1,10 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from typing import List
+import os
+import uuid
+from pathlib import Path
 from app.database import get_db
 from app.models import User, FamilyMember
 from app.schemas import FamilyMemberCreate, FamilyMemberUpdate, FamilyMemberResponse, FamilyTreeNode
@@ -127,12 +130,17 @@ async def delete_family_member(
 
 @router.get("/tree", response_model=List[FamilyTreeNode])
 async def get_family_tree(
+    tree_id: int = None,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db)
 ):
-    result = await db.execute(
-        select(FamilyMember).where(FamilyMember.user_id == current_user.id)
-    )
+    # Build query based on tree_id
+    query = select(FamilyMember).where(FamilyMember.user_id == current_user.id)
+
+    if tree_id:
+        query = query.where(FamilyMember.tree_id == tree_id)
+
+    result = await db.execute(query)
     members = result.scalars().all()
 
     # Build tree structure with children relationships
@@ -168,3 +176,76 @@ async def get_family_tree(
         tree_nodes.append(tree_node)
 
     return tree_nodes
+
+
+@router.post("/members/{member_id}/upload-photo")
+async def upload_member_photo(
+    member_id: int,
+    file: UploadFile = File(...),
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
+):
+    """Upload a profile picture for a family member"""
+
+    # Verify member belongs to current user
+    result = await db.execute(
+        select(FamilyMember).where(
+            FamilyMember.id == member_id,
+            FamilyMember.user_id == current_user.id
+        )
+    )
+    member = result.scalar_one_or_none()
+
+    if not member:
+        raise HTTPException(status_code=404, detail="Family member not found")
+
+    # Validate file type
+    allowed_types = ["image/jpeg", "image/jpg", "image/png", "image/gif", "image/webp"]
+    if file.content_type not in allowed_types:
+        raise HTTPException(
+            status_code=400,
+            detail="Invalid file type. Only JPEG, PNG, GIF, and WebP images are allowed."
+        )
+
+    # Validate file size (max 5MB)
+    file_size = 0
+    content = await file.read()
+    file_size = len(content)
+
+    if file_size > 5 * 1024 * 1024:  # 5MB
+        raise HTTPException(status_code=400, detail="File size exceeds 5MB limit")
+
+    # Reset file position
+    await file.seek(0)
+
+    # Create uploads directory if it doesn't exist
+    upload_dir = Path("uploads/profile_pictures")
+    upload_dir.mkdir(parents=True, exist_ok=True)
+
+    # Generate unique filename
+    file_extension = file.filename.split(".")[-1] if "." in file.filename else "jpg"
+    unique_filename = f"{uuid.uuid4()}.{file_extension}"
+    file_path = upload_dir / unique_filename
+
+    # Save file
+    with open(file_path, "wb") as f:
+        f.write(content)
+
+    # Delete old photo if exists
+    if member.photo_url:
+        old_file_path = Path(member.photo_url)
+        if old_file_path.exists():
+            try:
+                old_file_path.unlink()
+            except Exception:
+                pass  # Ignore errors when deleting old file
+
+    # Update member's photo_url
+    member.photo_url = f"/uploads/profile_pictures/{unique_filename}"
+    await db.commit()
+    await db.refresh(member)
+
+    return {
+        "message": "Photo uploaded successfully",
+        "photo_url": member.photo_url
+    }

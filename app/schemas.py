@@ -177,15 +177,83 @@ class BackupResponse(BaseModel):
 class DashboardStats(BaseModel):
     total_users: int
     active_users: int
+    total_family_trees: int
     total_family_members: int
     total_tree_views: int
+    total_tree_shares: int
     recent_logs: List[SystemLogResponse]
     app_version: str
     uptime: str
     database_size: Optional[str] = None
+    # System resources
+    cpu_percent: float
+    cpu_cores: int
+    cpu_speed: str
+    memory_percent: float
+    memory_total: str
+    memory_available: str
+    disk_percent: float
+    disk_total: str
+    disk_available: str
+    python_version: str
+    platform: str
+    architecture: str
 
 
 class AdminSetup(BaseModel):
     username: str
     email: EmailStr
     password: str
+
+
+# Family Tree Schemas
+class FamilyTreeBase(BaseModel):
+    name: str
+    description: Optional[str] = None
+    is_default: bool = False
+
+
+class FamilyTreeCreate(FamilyTreeBase):
+    pass
+
+
+class FamilyTreeUpdate(BaseModel):
+    name: Optional[str] = None
+    description: Optional[str] = None
+    is_default: Optional[bool] = None
+    is_active: Optional[bool] = None
+
+
+class FamilyTreeResponse(FamilyTreeBase):
+    id: int
+    user_id: int
+    is_active: bool
+    member_count: int = 0
+    created_at: datetime
+    updated_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+# Tree Share Schemas
+class TreeShareCreate(BaseModel):
+    tree_id: int
+    shared_with_username: str
+    permission_level: str = "view"  # "view" or "edit"
+
+
+class TreeShareResponse(BaseModel):
+    id: int
+    tree_id: int
+    tree_name: str
+    shared_by_user_id: int
+    shared_by_username: str
+    shared_with_user_id: int
+    shared_with_username: str
+    permission_level: str
+    is_accepted: bool
+    created_at: datetime
+
+    class Config:
+        from_attributes = True

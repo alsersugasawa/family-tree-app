@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Admin Portal - Family Tree App v2.1.0</title>
+    <title>Admin Portal - Family Tree App v3.0.0</title>
     <!-- Bootstrap 5.3 CSS -->
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <!-- Bootstrap Icons -->
@@ -48,7 +48,14 @@
                 <div class="stat-icon">✅</div>
                 <div class="stat-info">
                     <h3 id="stat-active-users">0</h3>
-                    <p>Active Users</p>
+                    <p>Active Users (Last 30 days)</p>
+                </div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-icon">🌲</div>
+                <div class="stat-info">
+                    <h3 id="stat-family-trees">0</h3>
+                    <p>Family Trees</p>
                 </div>
             </div>
             <div class="stat-card">
@@ -62,21 +69,70 @@
                 <div class="stat-icon">🌳</div>
                 <div class="stat-info">
                     <h3 id="stat-tree-views">0</h3>
-                    <p>Tree Views</p>
+                    <p>Saved Views</p>
+                </div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-icon">🤝</div>
+                <div class="stat-info">
+                    <h3 id="stat-tree-shares">0</h3>
+                    <p>Tree Shares</p>
                 </div>
             </div>
         </div>
 
         <div class="dashboard-grid">
             <div class="dashboard-card">
-                <h3>System Information</h3>
+                <h3><i class="bi bi-cpu"></i> System Resources</h3>
                 <div class="info-grid">
                     <div class="info-item">
-                        <span class="label">Version:</span>
-                        <span id="system-version">-</span>
+                        <span class="label"><i class="bi bi-cpu"></i> CPU Usage:</span>
+                        <span id="system-cpu-percent" class="resource-value">-</span>
                     </div>
                     <div class="info-item">
-                        <span class="label">Uptime:</span>
+                        <span class="label"><i class="bi bi-speedometer2"></i> CPU Speed:</span>
+                        <span id="system-cpu-speed">-</span>
+                    </div>
+                    <div class="info-item">
+                        <span class="label"><i class="bi bi-cpu-fill"></i> CPU Cores:</span>
+                        <span id="system-cpu-cores">-</span>
+                    </div>
+                    <div class="info-item">
+                        <span class="label"><i class="bi bi-memory"></i> RAM Usage:</span>
+                        <span id="system-memory-percent" class="resource-value">-</span>
+                    </div>
+                    <div class="info-item">
+                        <span class="label"><i class="bi bi-memory"></i> RAM Total:</span>
+                        <span id="system-memory-total">-</span>
+                    </div>
+                    <div class="info-item">
+                        <span class="label"><i class="bi bi-memory"></i> RAM Available:</span>
+                        <span id="system-memory-available">-</span>
+                    </div>
+                    <div class="info-item">
+                        <span class="label"><i class="bi bi-device-hdd"></i> Disk Usage:</span>
+                        <span id="system-disk-percent" class="resource-value">-</span>
+                    </div>
+                    <div class="info-item">
+                        <span class="label"><i class="bi bi-device-hdd"></i> Disk Total:</span>
+                        <span id="system-disk-total">-</span>
+                    </div>
+                    <div class="info-item">
+                        <span class="label"><i class="bi bi-device-hdd-fill"></i> Disk Available:</span>
+                        <span id="system-disk-available">-</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="dashboard-card">
+                <h3><i class="bi bi-info-circle"></i> System Information</h3>
+                <div class="info-grid">
+                    <div class="info-item">
+                        <span class="label">App Version:</span>
+                        <span id="system-version">2.3.0</span>
+                    </div>
+                    <div class="info-item">
+                        <span class="label">System Uptime:</span>
                         <span id="system-uptime">-</span>
                     </div>
                     <div class="info-item">
@@ -84,22 +140,52 @@
                         <span id="system-db-size">-</span>
                     </div>
                     <div class="info-item">
-                        <span class="label">CPU Usage:</span>
-                        <span id="system-cpu">-</span>
+                        <span class="label">Python Version:</span>
+                        <span id="python-version">-</span>
                     </div>
                     <div class="info-item">
-                        <span class="label">Memory Usage:</span>
-                        <span id="system-memory">-</span>
+                        <span class="label">Platform:</span>
+                        <span id="system-platform">-</span>
                     </div>
                     <div class="info-item">
-                        <span class="label">Disk Usage:</span>
-                        <span id="system-disk">-</span>
+                        <span class="label">Architecture:</span>
+                        <span id="system-arch">-</span>
                     </div>
                 </div>
             </div>
 
             <div class="dashboard-card">
-                <h3>Recent Activity</h3>
+                <h3><i class="bi bi-diagram-3"></i> Services Layout</h3>
+                <div class="services-layout">
+                    <div class="service-item" id="service-web">
+                        <div class="service-status status-unknown"></div>
+                        <div class="service-info">
+                            <strong>Web Application</strong>
+                            <small>FastAPI + uvicorn</small>
+                            <span class="service-port">Port: 8000</span>
+                        </div>
+                    </div>
+                    <div class="service-item" id="service-db">
+                        <div class="service-status status-unknown"></div>
+                        <div class="service-info">
+                            <strong>PostgreSQL Database</strong>
+                            <small>postgres:14-alpine</small>
+                            <span class="service-port">Port: 5432</span>
+                        </div>
+                    </div>
+                    <div class="service-item" id="service-uploads">
+                        <div class="service-status status-unknown"></div>
+                        <div class="service-info">
+                            <strong>File Storage</strong>
+                            <small>Static files & uploads</small>
+                            <span class="service-port">Mounted volumes</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="dashboard-card">
+                <h3><i class="bi bi-clock-history"></i> Recent Activity</h3>
                 <div id="recent-logs" class="logs-preview"></div>
             </div>
         </div>

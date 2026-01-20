@@ -7,7 +7,7 @@ import os
 import subprocess
 import psutil
 from app.database import get_db
-from app.models import User, SystemLog, Backup, FamilyMember, TreeView
+from app.models import User, SystemLog, Backup, FamilyMember, TreeView, FamilyTree, TreeShare
 from app.schemas import (
     AdminUserCreate, AdminUserUpdate, AdminUserResponse,
     SystemLogResponse, BackupCreate, BackupResponse,
@@ -19,7 +19,7 @@ from app.auth import (
 
 router = APIRouter(prefix="/api/admin", tags=["admin"])
 
-APP_VERSION = "2.2.0"
+APP_VERSION = "3.0.0"
 START_TIME = datetime.utcnow()
 
 
@@ -119,10 +119,19 @@ async def get_dashboard_stats(
     total_users_result = await db.execute(select(func.count(User.id)))
     total_users = total_users_result.scalar()
 
+    # Count active users (logged in within last 30 days)
+    thirty_days_ago = datetime.utcnow() - timedelta(days=30)
     active_users_result = await db.execute(
-        select(func.count(User.id)).where(User.is_active == True)
+        select(func.count(User.id)).where(
+            User.is_active == True,
+            User.last_login >= thirty_days_ago
+        )
     )
     active_users = active_users_result.scalar()
+
+    # Count family trees
+    total_trees_result = await db.execute(select(func.count(FamilyTree.id)))
+    total_family_trees = total_trees_result.scalar()
 
     # Count family members
     total_members_result = await db.execute(select(func.count(FamilyMember.id)))
@@ -131,6 +140,10 @@ async def get_dashboard_stats(
     # Count tree views
     total_views_result = await db.execute(select(func.count(TreeView.id)))
     total_tree_views = total_views_result.scalar()
+
+    # Count tree shares
+    total_shares_result = await db.execute(select(func.count(TreeShare.id)))
+    total_tree_shares = total_shares_result.scalar()
 
     # Get recent logs
     logs_result = await db.execute(
@@ -151,15 +164,54 @@ async def get_dashboard_stats(
     except Exception:
         database_size = "N/A"
 
+    # Get system resource usage
+    import platform
+    import sys
+
+    # CPU metrics
+    cpu_percent = psutil.cpu_percent(interval=0.1)
+    cpu_count = psutil.cpu_count()
+    try:
+        cpu_freq = psutil.cpu_freq()
+        cpu_speed = f"{cpu_freq.current:.0f} MHz" if cpu_freq else "N/A"
+    except:
+        cpu_speed = "N/A"
+
+    # Memory metrics
+    memory = psutil.virtual_memory()
+    memory_total_gb = memory.total / (1024**3)
+    memory_available_gb = memory.available / (1024**3)
+    memory_percent = memory.percent
+
+    # Disk metrics
+    disk = psutil.disk_usage('/')
+    disk_total_gb = disk.total / (1024**3)
+    disk_available_gb = disk.free / (1024**3)
+    disk_percent = disk.percent
+
     return DashboardStats(
         total_users=total_users,
         active_users=active_users,
+        total_family_trees=total_family_trees,
         total_family_members=total_family_members,
         total_tree_views=total_tree_views,
+        total_tree_shares=total_tree_shares,
         recent_logs=recent_logs,
         app_version=APP_VERSION,
         uptime=uptime_str,
-        database_size=database_size
+        database_size=database_size,
+        cpu_percent=cpu_percent,
+        cpu_cores=cpu_count,
+        cpu_speed=cpu_speed,
+        memory_percent=memory_percent,
+        memory_total=f"{memory_total_gb:.2f} GB",
+        memory_available=f"{memory_available_gb:.2f} GB",
+        disk_percent=disk_percent,
+        disk_total=f"{disk_total_gb:.2f} GB",
+        disk_available=f"{disk_available_gb:.2f} GB",
+        python_version=sys.version.split()[0],
+        platform=platform.system(),
+        architecture=platform.machine()
     )
 
 

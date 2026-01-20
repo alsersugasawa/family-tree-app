@@ -21,6 +21,8 @@ class User(Base):
 
     family_members = relationship("FamilyMember", back_populates="owner", cascade="all, delete-orphan")
     tree_views = relationship("TreeView", back_populates="owner", cascade="all, delete-orphan")
+    family_trees = relationship("FamilyTree", back_populates="owner", cascade="all, delete-orphan")
+    shared_trees = relationship("TreeShare", foreign_keys="TreeShare.shared_with_user_id", back_populates="shared_with_user", cascade="all, delete-orphan")
 
 
 class FamilyMember(Base):
@@ -28,6 +30,7 @@ class FamilyMember(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    tree_id = Column(Integer, ForeignKey("family_trees.id"), nullable=True)  # Link to family tree
     first_name = Column(String(100), nullable=False)
     middle_name = Column(String(100), nullable=True)
     last_name = Column(String(100), nullable=False)
@@ -53,6 +56,7 @@ class FamilyMember(Base):
     mother = relationship("FamilyMember", remote_side=[id], foreign_keys=[mother_id], backref="children_as_mother")
 
     owner = relationship("User", back_populates="family_members")
+    tree = relationship("FamilyTree", back_populates="members")
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
@@ -104,3 +108,38 @@ class Backup(Base):
     created_by = Column(Integer, ForeignKey("users.id"), nullable=False)
     status = Column(String(20), default="completed")  # "completed", "failed", "in_progress"
     created_at = Column(DateTime, default=datetime.utcnow)
+
+
+class FamilyTree(Base):
+    __tablename__ = "family_trees"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    name = Column(String(200), nullable=False)
+    description = Column(Text, nullable=True)
+    is_default = Column(Boolean, default=False)
+    is_active = Column(Boolean, default=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    # Relationships
+    owner = relationship("User", back_populates="family_trees")
+    members = relationship("FamilyMember", back_populates="tree", cascade="all, delete-orphan")
+    shares = relationship("TreeShare", back_populates="tree", cascade="all, delete-orphan")
+
+
+class TreeShare(Base):
+    __tablename__ = "tree_shares"
+
+    id = Column(Integer, primary_key=True, index=True)
+    tree_id = Column(Integer, ForeignKey("family_trees.id"), nullable=False)
+    shared_by_user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    shared_with_user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    permission_level = Column(String(20), default="view")  # "view", "edit"
+    is_accepted = Column(Boolean, default=False)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    # Relationships
+    tree = relationship("FamilyTree", back_populates="shares")
+    shared_by_user = relationship("User", foreign_keys=[shared_by_user_id])
+    shared_with_user = relationship("User", foreign_keys=[shared_with_user_id], back_populates="shared_trees")
