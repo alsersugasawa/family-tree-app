@@ -674,24 +674,80 @@ async def download_backup(
 async def restore_backup(
     backup_file: UploadFile = File(...),
     password: Optional[str] = None,
+    create_snapshot: bool = True,
     request: Request = None,
     current_admin: User = Depends(get_current_admin_user),
     db: AsyncSession = Depends(get_db)
 ):
-    """Restore database from uploaded backup file."""
+    """Restore database from uploaded backup file with automatic snapshot creation."""
     temp_dir = backup_settings.backup_dir
     os.makedirs(temp_dir, exist_ok=True)
 
     # Save uploaded file
     temp_filepath = os.path.join(temp_dir, f"restore_temp_{datetime.utcnow().strftime('%Y%m%d_%H%M%S')}.sql")
+    snapshot_filename = None
+    snapshot_backup_id = None
 
     try:
-        # Write uploaded file to disk
+        # Step 1: Create snapshot of current database before restoring
+        if create_snapshot:
+            timestamp = datetime.utcnow().strftime("%Y%m%d_%H%M%S")
+            snapshot_filename = f"snapshot_before_restore_{timestamp}.sql"
+            snapshot_filepath = os.path.join(backup_settings.backup_dir, snapshot_filename)
+
+            # Create snapshot backup
+            snapshot_result = subprocess.run(
+                [
+                    "pg_dump",
+                    "-h", "db",
+                    "-U", "postgres",
+                    "-d", "familytree",
+                    "-f", snapshot_filepath
+                ],
+                check=True,
+                env={**os.environ, "PGPASSWORD": "postgres"},
+                capture_output=True,
+                text=True
+            )
+
+            if snapshot_result.returncode != 0:
+                raise HTTPException(
+                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                    detail=f"Failed to create snapshot backup: {snapshot_result.stderr}"
+                )
+
+            # Get file size and create backup record
+            snapshot_file_size = os.path.getsize(snapshot_filepath)
+            snapshot_record = Backup(
+                filename=snapshot_filename,
+                backup_type="snapshot",
+                file_size=snapshot_file_size,
+                created_by=current_admin.id,
+                status="completed"
+            )
+            db.add(snapshot_record)
+            await db.commit()
+            await db.refresh(snapshot_record)
+            snapshot_backup_id = snapshot_record.id
+
+            # Log snapshot creation
+            await log_action(
+                db, "INFO", f"Snapshot backup created before restore: {snapshot_filename}",
+                user_id=current_admin.id, action="snapshot_created",
+                details={
+                    "backup_id": snapshot_backup_id,
+                    "file_size": snapshot_file_size,
+                    "reason": "pre-restore snapshot"
+                },
+                ip_address=request.client.host if request else None
+            )
+
+        # Step 2: Write uploaded file to disk
         with open(temp_filepath, 'wb') as f:
             content = await backup_file.read()
             f.write(content)
 
-        # If file is encrypted, decrypt it first
+        # Step 3: If file is encrypted, decrypt it first
         restore_filepath = temp_filepath
         if password or temp_filepath.endswith('.encrypted'):
             if not password:
@@ -708,7 +764,7 @@ async def restore_backup(
                     detail=str(e)
                 )
 
-        # Restore database using psql
+        # Step 4: Restore database using psql
         result = subprocess.run(
             [
                 "psql",
@@ -723,33 +779,51 @@ async def restore_backup(
         )
 
         if result.returncode != 0:
+            # Restore failed - inform user about snapshot
+            error_msg = f"Database restore failed: {result.stderr}"
+            if snapshot_filename:
+                error_msg += f"\n\nA snapshot backup was created before the restore attempt: {snapshot_filename} (ID: {snapshot_backup_id}). You can use this to restore to the previous state."
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail=f"Database restore failed: {result.stderr}"
+                detail=error_msg
             )
 
-        # Log the action
+        # Step 5: Log successful restore
         await log_action(
             db, "WARNING", f"Database restored from uploaded backup",
             user_id=current_admin.id, action="backup_restored",
             details={
                 "filename": backup_file.filename,
-                "encrypted": bool(password)
+                "encrypted": bool(password),
+                "snapshot_created": create_snapshot,
+                "snapshot_id": snapshot_backup_id if create_snapshot else None
             },
             ip_address=request.client.host if request else None
         )
 
-        return {
+        response_data = {
             "message": "Database restored successfully",
             "filename": backup_file.filename
         }
 
+        if snapshot_filename:
+            response_data["snapshot"] = {
+                "id": snapshot_backup_id,
+                "filename": snapshot_filename,
+                "message": "A snapshot of the previous database state was created and can be used to roll back if needed"
+            }
+
+        return response_data
+
     except HTTPException:
         raise
     except Exception as e:
+        error_msg = f"Restore failed: {str(e)}"
+        if snapshot_filename:
+            error_msg += f"\n\nA snapshot backup was created: {snapshot_filename} (ID: {snapshot_backup_id})"
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Restore failed: {str(e)}"
+            detail=error_msg
         )
     finally:
         # Clean up temporary files

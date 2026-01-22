@@ -392,10 +392,13 @@ async function loadBackups() {
             return;
         }
 
-        tbody.innerHTML = backups.map(backup => `
+        tbody.innerHTML = backups.map(backup => {
+            const typeClass = backup.backup_type === 'snapshot' ? 'badge-warning' : 'badge-info';
+            const typeIcon = backup.backup_type === 'snapshot' ? '📸 ' : '';
+            return `
             <tr>
                 <td>${backup.filename}</td>
-                <td><span class="badge badge-info">${backup.backup_type}</span></td>
+                <td><span class="badge ${typeClass}">${typeIcon}${backup.backup_type}</span></td>
                 <td>${formatFileSize(backup.file_size)}</td>
                 <td><span class="badge badge-${backup.status === 'completed' ? 'success' : 'warning'}">${backup.status}</span></td>
                 <td>${formatDateTime(backup.created_at)}</td>
@@ -405,7 +408,8 @@ async function loadBackups() {
                     </button>
                 </td>
             </tr>
-        `).join('');
+        `;
+        }).join('');
 
     } catch (error) {
         console.error('Error loading backups:', error);
@@ -545,6 +549,7 @@ async function confirmRestoreBackup() {
     const fileInput = document.getElementById('restore-file');
     const isEncrypted = document.getElementById('is-encrypted-checkbox').checked;
     const password = document.getElementById('decrypt-password').value;
+    const createSnapshot = document.getElementById('create-snapshot-checkbox').checked;
 
     if (!fileInput.files || fileInput.files.length === 0) {
         alert('Please select a backup file');
@@ -556,13 +561,18 @@ async function confirmRestoreBackup() {
         return;
     }
 
-    if (!confirm('⚠️ WARNING: This will restore the database and overwrite all current data. This cannot be undone. Are you sure you want to continue?')) {
+    const warningMsg = createSnapshot
+        ? '⚠️ WARNING: This will restore the database and overwrite all current data.\n\nA snapshot of the current database will be created first, allowing you to roll back if needed.\n\nAre you sure you want to continue?'
+        : '⚠️ WARNING: This will restore the database and overwrite all current data WITHOUT creating a snapshot.\n\nThis is NOT recommended. You will not be able to roll back.\n\nAre you sure you want to continue?';
+
+    if (!confirm(warningMsg)) {
         return;
     }
 
     try {
         const formData = new FormData();
         formData.append('backup_file', fileInput.files[0]);
+        formData.append('create_snapshot', createSnapshot);
         if (isEncrypted && password) {
             formData.append('password', password);
         }
@@ -581,7 +591,14 @@ async function confirmRestoreBackup() {
         }
 
         const result = await response.json();
-        alert(`Database restored successfully from ${result.filename}`);
+
+        let successMsg = `Database restored successfully from ${result.filename}`;
+        if (result.snapshot) {
+            successMsg += `\n\n✓ Snapshot created: ${result.snapshot.filename} (ID: ${result.snapshot.id})`;
+            successMsg += `\n${result.snapshot.message}`;
+        }
+
+        alert(successMsg);
         closeRestoreBackupModal();
 
         // Reload dashboard data

@@ -530,13 +530,20 @@ To restore a database from a backup:
 
 1. Click the "Restore Backup" button in the admin portal
 2. Select your backup file (`.sql` or `.sql.encrypted`)
-3. If the backup is encrypted:
+3. **Snapshot Creation** (Recommended):
+   - "Create snapshot before restoring" is checked by default
+   - This automatically creates a backup of your current database before restoring
+   - The snapshot allows you to roll back if the restore doesn't work as expected
+   - Snapshots are labeled with 📸 icon and "snapshot" type in the backup list
+4. If the backup is encrypted:
    - Check "Backup is encrypted"
    - Enter the decryption password
-4. Confirm the restore operation
-5. The database will be restored to the state captured in the backup
+5. Confirm the restore operation
+6. The database will be restored to the state captured in the backup
 
-**⚠️ Warning**: Restoring a backup will overwrite all current data. This cannot be undone. Always create a fresh backup before restoring.
+**Snapshot Rollback**: If you need to undo a restore, simply restore from the snapshot backup that was automatically created. Snapshots are named `snapshot_before_restore_TIMESTAMP.sql` and appear in your backup list.
+
+**⚠️ Warning**: While snapshots provide a safety net, they also consume disk space. The snapshot creation option is enabled by default but can be unchecked if you're certain about the restore.
 
 #### Security Best Practices
 - **Always encrypt backups** when downloading for offsite storage
