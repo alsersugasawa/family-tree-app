@@ -437,7 +437,9 @@ BACKUP_DIR=/app/backups
 BACKUP_RETENTION_DAYS=30
 ```
 
-To store backups on your host machine, add a volume mount in docker-compose.yml:
+Backups are automatically persisted to the host machine in the `./backups` directory via Docker volume mount. This ensures backups survive container rebuilds.
+
+To use a custom backup location, edit the volume mount in docker-compose.yml:
 
 ```yaml
 volumes:
@@ -445,6 +447,8 @@ volumes:
 ```
 
 The backups directory is excluded from Git via `.gitignore`, so local backups won't be committed.
+
+**Important**: The `./backups` directory will be created automatically when you start the application. Make sure the directory is readable/writable by the Docker container user (UID 1000).
 
 ### SMB/CIFS File Share (Optional)
 

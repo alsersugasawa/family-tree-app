@@ -38,8 +38,8 @@ services:
       - ./static:/app/static
       - ./migrations:/app/migrations
       - ./uploads:/app/uploads
-      # Backup location on host (stores in ./backups by default)
-      # To use external storage, uncomment and set path:
+      - ./backups:/app/backups
+      # To use external storage, change the path above:
       # - /your/backup/path:/app/backups
       # Optional: Mount SMB/NFS shares (uncomment and configure if using)
       # - smb_backups:/mnt/smb_backups
