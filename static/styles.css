@@ -878,7 +878,7 @@ body {
 
 /* Context Menu */
 .context-menu {
-    position: absolute;
+    position: fixed;
     background: white;
     border: 1px solid #ddd;
     border-radius: 8px;
@@ -910,4 +910,10 @@ body {
 
 .context-menu-item:active {
     background: #e0e0e0;
+}
+
+.context-menu-divider {
+    height: 1px;
+    background: #ddd;
+    margin: 4px 0;
 }

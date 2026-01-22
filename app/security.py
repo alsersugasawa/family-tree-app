@@ -62,7 +62,7 @@ CSP_POLICY = os.getenv("CSP_POLICY",
     "style-src 'self' https://cdn.jsdelivr.net 'unsafe-inline'; "
     "img-src 'self' data: blob:; "
     "font-src 'self' https://cdn.jsdelivr.net; "
-    "connect-src 'self'; "
+    "connect-src 'self' https://cdn.jsdelivr.net https://cdnjs.cloudflare.com; "
     "frame-ancestors 'none';"
 )
 

@@ -2084,17 +2084,26 @@ let contextMenuMember = null;
 
 function showContextMenu(event, memberData) {
     const contextMenu = document.getElementById('context-menu');
+
+    if (!contextMenu) {
+        console.error('Context menu element not found!');
+        return;
+    }
+
     contextMenuMember = memberData;
 
-    // Position the context menu at cursor location
-    contextMenu.style.left = event.pageX + 'px';
-    contextMenu.style.top = event.pageY + 'px';
+    // Position the context menu at cursor location using clientX/clientY (viewport coordinates)
+    // Add offset to prevent cursor from being over the menu immediately
+    contextMenu.style.position = 'fixed';
+    contextMenu.style.left = (event.clientX + 5) + 'px';
+    contextMenu.style.top = (event.clientY + 5) + 'px';
     contextMenu.style.display = 'block';
+    contextMenu.style.visibility = 'visible';
 
-    // Close menu when clicking anywhere else
+    // Close menu when clicking anywhere else (delayed to prevent immediate close)
     setTimeout(() => {
-        document.addEventListener('click', hideContextMenu);
-    }, 0);
+        document.addEventListener('click', hideContextMenu, { once: true });
+    }, 100);
 }
 
 function hideContextMenu() {
@@ -2127,6 +2136,21 @@ function contextMenuEditMember() {
         editMember(contextMenuMember.id);
     }
     hideContextMenu();
+}
+
+function contextMenuExportJPEG() {
+    hideContextMenu();
+    exportTreeAsImage();
+}
+
+function contextMenuExportPDF() {
+    hideContextMenu();
+    exportTreeAsPDF();
+}
+
+function contextMenuExportCSV() {
+    hideContextMenu();
+    exportDataCSV();
 }
 
 async function exportHighlightedPDF() {
