@@ -5,6 +5,52 @@ All notable changes to the Family Tree App will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.0.1] - 2026-01-22
+
+### Added
+- **Kubernetes Deployment Support**
+  - Complete set of 11 Kubernetes manifests for production deployment
+  - Namespace isolation with `family-tree` namespace
+  - PostgreSQL deployment with 10Gi persistent storage
+  - Web application deployment with 2 replicas for high availability
+  - Horizontal Pod Autoscaler (2-10 replicas based on CPU/memory)
+  - Ingress controller support with TLS/cert-manager integration
+  - ConfigMaps and Secrets for configuration management
+  - Automated deployment script (`deploy.sh`)
+  - Comprehensive 500+ line deployment guide in `k8s/README.md`
+  - Init containers for automatic database migrations
+  - Health checks (liveness and readiness probes)
+  - Resource limits and requests for optimal performance
+  - Session affinity for better user experience
+
+### Changed
+- **Database Image Storage Implementation**
+  - Profile pictures now stored in PostgreSQL database as base64-encoded data
+  - Eliminates file system dependencies for uploads
+  - Simplifies backups (all data in database)
+  - Migration script `008_store_photos_in_database.sql` adds new columns
+  - Backward compatible with existing `photo_url` field
+  - Data URL format for serving images from database
+
+- **Documentation Consolidation**
+  - Streamlined `README.md` to essential sections only
+  - Detailed content moved to `USER_GUIDE.md`
+  - Added Docker Management section to USER_GUIDE
+  - Added Project Structure section to USER_GUIDE
+  - Created `k8s/README.md` with complete Kubernetes guide
+  - Updated architecture diagram with ASCII-compatible characters
+
+### Fixed
+- Database migration execution in Docker environment
+- Family tree diagram rendering issues
+- Kubernetes deployment image versioning
+
+### Deployment Methods
+The application now supports three deployment options:
+1. **Docker Compose** - Quick local setup (recommended for development)
+2. **Kubernetes** - Production-ready cloud-native deployment (NEW)
+3. **Local Development** - Direct Python setup for development
+
 ## [4.0.0] - 2026-01-22
 
 ### Added - Theme System
