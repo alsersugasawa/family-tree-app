@@ -639,7 +639,18 @@ async def create_backup(
             config_filepath = os.path.join(backup_dir, config_filename)
             create_config_backup(config_filepath)
 
-            # Use database file as primary filepath for now
+            # Copy both files to file shares
+            db_share_destinations = copy_to_file_shares(db_filepath, db_filename)
+            config_share_destinations = copy_to_file_shares(config_filepath, config_filename)
+
+            # Combine file share destinations
+            file_share_destinations = []
+            if db_share_destinations:
+                file_share_destinations.extend([f"DB: {dest}" for dest in db_share_destinations])
+            if config_share_destinations:
+                file_share_destinations.extend([f"Config: {dest}" for dest in config_share_destinations])
+
+            # Use database file as primary filepath for record
             filepath = db_filepath
             filename = db_filename
         else:
@@ -651,8 +662,11 @@ async def create_backup(
         # Get file size
         file_size = os.path.getsize(filepath)
 
-        # Copy to file shares if configured
-        file_share_destinations = copy_to_file_shares(filepath, filename)
+        # Copy to file shares if configured (for database and config backups only)
+        # Full backup already handled above
+        if backup_data.backup_type != "full":
+            file_share_destinations = copy_to_file_shares(filepath, filename)
+        # file_share_destinations already set for full backups
 
         # Create backup record
         backup_record = Backup(
