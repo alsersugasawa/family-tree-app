@@ -1,0 +1,7 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: family-tree
+  labels:
+    app: family-tree
+    environment: production

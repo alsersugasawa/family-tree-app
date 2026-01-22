@@ -51,14 +51,19 @@ All dependencies are included in the container.
 - Docker Desktop or Docker Engine
 - Docker Compose
 
-**Option 2: Local Development**
+**Option 2: Kubernetes**
+- Kubernetes cluster (v1.20+)
+- kubectl configured
+- Container registry access
+
+**Option 3: Local Development**
 - Python 3.8+
 - PostgreSQL 14
 - pip (Python package manager)
 
 ## Setup Instructions
 
-### Docker Setup (Recommended)
+### Option A: Docker Setup (Recommended)
 
 1. **Install Docker Desktop**
    Download from [docker.com](https://www.docker.com/products/docker-desktop/)
@@ -84,7 +89,37 @@ All dependencies are included in the container.
    docker-compose down
    ```
 
-### Local Development Setup
+### Option B: Kubernetes Setup
+
+1. **Prerequisites**
+   - Kubernetes cluster running
+   - kubectl configured
+   - Ingress controller installed (optional)
+
+2. **Quick Deploy**
+   ```bash
+   # Deploy all resources
+   kubectl apply -f k8s/
+
+   # Wait for pods to be ready
+   kubectl wait --for=condition=ready pod -l app=family-tree-web -n family-tree --timeout=120s
+   ```
+
+3. **Access the Application**
+   ```bash
+   # Port forward
+   kubectl port-forward -n family-tree svc/family-tree-web 8080:80
+
+   # Access at http://localhost:8080
+   ```
+
+4. **See [k8s/README.md](k8s/README.md) for:**
+   - Detailed deployment instructions
+   - Scaling and autoscaling
+   - Monitoring and logging
+   - Production best practices
+
+### Option C: Local Development Setup
 
 1. **Install PostgreSQL 14**
    ```bash

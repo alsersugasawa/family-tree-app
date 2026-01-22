@@ -1,0 +1,15 @@
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: app-backups-pvc
+  namespace: family-tree
+  labels:
+    app: family-tree-web
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 5Gi
+  # Optional: Specify storage class
+  # storageClassName: standard
