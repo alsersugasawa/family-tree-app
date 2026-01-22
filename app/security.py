@@ -58,7 +58,7 @@ SECURITY_HEADERS_ENABLED = os.getenv("SECURITY_HEADERS_ENABLED", "true").lower()
 # OWASP ASVS 14.4.7
 CSP_POLICY = os.getenv("CSP_POLICY",
     "default-src 'self'; "
-    "script-src 'self' https://cdn.jsdelivr.net 'unsafe-inline'; "
+    "script-src 'self' https://cdn.jsdelivr.net https://d3js.org https://cdnjs.cloudflare.com 'unsafe-inline'; "
     "style-src 'self' https://cdn.jsdelivr.net 'unsafe-inline'; "
     "img-src 'self' data: blob:; "
     "font-src 'self' https://cdn.jsdelivr.net; "
