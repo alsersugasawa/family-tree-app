@@ -1100,3 +1100,211 @@ async def get_system_info(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to get system info: {str(e)}"
         )
+
+
+@router.get("/version")
+async def get_version(
+    current_admin: User = Depends(get_current_admin_user)
+):
+    """Get current application version and check for updates."""
+    try:
+        # Get current version
+        current_version = APP_VERSION
+
+        # Check for latest version from GitHub
+        latest_version = None
+        update_available = False
+
+        try:
+            import requests
+            response = requests.get(
+                "https://api.github.com/repos/YOUR_GITHUB_ORG/family-tree-app/releases/latest",
+                timeout=5
+            )
+            if response.status_code == 200:
+                release_data = response.json()
+                latest_version = release_data.get("tag_name", "").lstrip("v")
+
+                # Compare versions
+                if latest_version and latest_version != current_version:
+                    update_available = True
+        except Exception as e:
+            print(f"Failed to check for updates: {e}")
+
+        return {
+            "current_version": current_version,
+            "latest_version": latest_version,
+            "update_available": update_available,
+            "github_repo": "YOUR_GITHUB_ORG/family-tree-app"
+        }
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to get version info: {str(e)}"
+        )
+
+
+@router.post("/update")
+async def trigger_update(
+    request: Request,
+    current_admin: User = Depends(get_current_admin_user),
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Trigger application update from GitHub.
+    This creates a snapshot backup, downloads the latest release, and triggers a restart.
+    """
+    try:
+        # Log the update initiation
+        await log_action(
+            db, "WARNING", "Application update initiated",
+            user_id=current_admin.id, action="update_initiated",
+            ip_address=request.client.host if request else None
+        )
+
+        # Create automatic backup before update
+        timestamp = datetime.utcnow().strftime("%Y%m%d_%H%M%S")
+        snapshot_filename = f"snapshot_before_update_{timestamp}.sql"
+        snapshot_filepath = os.path.join(backup_settings.backup_dir, snapshot_filename)
+
+        # Create database snapshot
+        snapshot_result = subprocess.run(
+            [
+                "pg_dump",
+                "-h", "db",
+                "-U", "postgres",
+                "-d", "familytree",
+                "-f", snapshot_filepath
+            ],
+            check=True,
+            env={**os.environ, "PGPASSWORD": "postgres"},
+            capture_output=True,
+            text=True
+        )
+
+        if snapshot_result.returncode != 0:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"Failed to create snapshot backup: {snapshot_result.stderr}"
+            )
+
+        # Get file size and create backup record
+        snapshot_file_size = os.path.getsize(snapshot_filepath)
+        snapshot_record = Backup(
+            filename=snapshot_filename,
+            backup_type="snapshot",
+            file_size=snapshot_file_size,
+            created_by=current_admin.id,
+            status="completed"
+        )
+        db.add(snapshot_record)
+        await db.commit()
+        await db.refresh(snapshot_record)
+
+        # Create update script
+        update_script_path = "/tmp/update_app.sh"
+        with open(update_script_path, 'w') as f:
+            f.write("""#!/bin/bash
+# Family Tree Application Update Script
+set -e
+
+echo "Starting application update..."
+
+# Navigate to app directory
+cd /app/..
+
+# Pull latest changes from GitHub
+echo "Pulling latest changes from GitHub..."
+if [ -d ".git" ]; then
+    git fetch origin main
+    git reset --hard origin/main
+else
+    echo "Not a git repository. Skipping git pull."
+fi
+
+# Install/update Python dependencies
+echo "Updating Python dependencies..."
+pip install --no-cache-dir -r requirements.txt
+
+# Run database migrations
+echo "Running database migrations..."
+cd /app
+alembic upgrade head
+
+echo "Update complete. Restarting application..."
+
+# Touch a file to trigger uvicorn reload (if using --reload)
+touch /app/main.py
+
+echo "Application updated successfully!"
+""")
+
+        # Make script executable
+        os.chmod(update_script_path, 0o755)
+
+        # Execute update script in background
+        subprocess.Popen(
+            ["/bin/bash", update_script_path],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            start_new_session=True
+        )
+
+        # Log successful update trigger
+        await log_action(
+            db, "WARNING", f"Application update triggered. Snapshot backup created: {snapshot_filename}",
+            user_id=current_admin.id, action="update_triggered",
+            details={"snapshot_id": snapshot_record.id},
+            ip_address=request.client.host if request else None
+        )
+
+        return {
+            "message": "Update initiated. Application will restart automatically.",
+            "snapshot": {
+                "id": snapshot_record.id,
+                "filename": snapshot_filename,
+                "message": "A snapshot backup was created before the update"
+            }
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Update failed: {str(e)}"
+        )
+
+
+@router.get("/update-status")
+async def get_update_status(
+    current_admin: User = Depends(get_current_admin_user)
+):
+    """Get the status of the last update operation."""
+    try:
+        # Check if update script is running
+        result = subprocess.run(
+            ["pgrep", "-f", "update_app.sh"],
+            capture_output=True,
+            text=True
+        )
+
+        is_updating = result.returncode == 0
+
+        # Check if update log exists
+        update_log_path = "/tmp/update_app.log"
+        log_output = ""
+        if os.path.exists(update_log_path):
+            with open(update_log_path, 'r') as f:
+                log_output = f.read()
+
+        return {
+            "is_updating": is_updating,
+            "log_output": log_output,
+            "timestamp": datetime.utcnow().isoformat()
+        }
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to get update status: {str(e)}"
+        )

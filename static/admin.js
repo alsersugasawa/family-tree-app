@@ -1014,3 +1014,162 @@ async function saveBackupSettings() {
         alert(`Failed to save backup settings: ${error.message}`);
     }
 }
+
+// Application Update Functions
+async function checkForUpdates() {
+    try {
+        const checkBtn = document.getElementById('check-update-btn');
+        const statusText = document.getElementById('update-status-text');
+
+        checkBtn.disabled = true;
+        checkBtn.innerHTML = '<i class="bi bi-hourglass-split"></i> Checking...';
+        statusText.textContent = 'Checking for updates...';
+
+        const response = await fetch('/api/admin/version', {
+            headers: {
+                'Authorization': `Bearer ${localStorage.getItem('adminToken')}`
+            }
+        });
+
+        if (!response.ok) {
+            throw new Error('Failed to check for updates');
+        }
+
+        const versionInfo = await response.json();
+
+        // Update version display
+        document.getElementById('current-version').textContent = versionInfo.current_version;
+        document.getElementById('latest-version').textContent = versionInfo.latest_version || 'N/A';
+
+        const updateBanner = document.getElementById('update-available-banner');
+        const installBtn = document.getElementById('install-update-btn');
+
+        if (versionInfo.update_available) {
+            updateBanner.style.display = 'block';
+            installBtn.disabled = false;
+            statusText.innerHTML = '<span style="color: #ff9800;">Update Available</span>';
+        } else {
+            updateBanner.style.display = 'none';
+            installBtn.disabled = true;
+            statusText.innerHTML = '<span style="color: #4caf50;">Up to Date</span>';
+        }
+
+        checkBtn.disabled = false;
+        checkBtn.innerHTML = '<i class="bi bi-arrow-clockwise"></i> Check for Updates';
+
+    } catch (error) {
+        console.error('Error checking for updates:', error);
+        document.getElementById('update-status-text').innerHTML = '<span style="color: #f44336;">Check Failed</span>';
+
+        const checkBtn = document.getElementById('check-update-btn');
+        checkBtn.disabled = false;
+        checkBtn.innerHTML = '<i class="bi bi-arrow-clockwise"></i> Check for Updates';
+
+        alert(`Failed to check for updates: ${error.message}`);
+    }
+}
+
+async function installUpdate() {
+    if (!confirm('This will update the application to the latest version.\n\nA snapshot backup will be created automatically before the update.\n\nThe application will restart during this process.\n\nDo you want to proceed?')) {
+        return;
+    }
+
+    try {
+        const installBtn = document.getElementById('install-update-btn');
+        const checkBtn = document.getElementById('check-update-btn');
+        const progressDiv = document.getElementById('update-progress');
+        const statusText = document.getElementById('update-status-text');
+
+        // Disable buttons and show progress
+        installBtn.disabled = true;
+        checkBtn.disabled = true;
+        progressDiv.style.display = 'block';
+        statusText.textContent = 'Installing update...';
+
+        const response = await fetch('/api/admin/update', {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${localStorage.getItem('adminToken')}`,
+                'Content-Type': 'application/json'
+            }
+        });
+
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.detail || 'Update failed');
+        }
+
+        const result = await response.json();
+
+        // Show success message
+        alert(`${result.message}\n\nSnapshot Backup ID: ${result.snapshot.id}\nFilename: ${result.snapshot.filename}\n\nThe application is updating and will restart automatically.`);
+
+        // Poll for update status
+        pollUpdateStatus();
+
+    } catch (error) {
+        console.error('Error installing update:', error);
+
+        // Re-enable buttons and hide progress
+        document.getElementById('install-update-btn').disabled = false;
+        document.getElementById('check-update-btn').disabled = false;
+        document.getElementById('update-progress').style.display = 'none';
+        document.getElementById('update-status-text').innerHTML = '<span style="color: #f44336;">Update Failed</span>';
+
+        alert(`Failed to install update: ${error.message}`);
+    }
+}
+
+async function pollUpdateStatus() {
+    const maxAttempts = 60; // Poll for up to 5 minutes
+    let attempts = 0;
+
+    const pollInterval = setInterval(async () => {
+        attempts++;
+
+        if (attempts > maxAttempts) {
+            clearInterval(pollInterval);
+            document.getElementById('update-status-text').innerHTML = '<span style="color: #ff9800;">Update Status Unknown</span>';
+            alert('Update status check timed out. Please check the system manually.');
+            return;
+        }
+
+        try {
+            const response = await fetch('/api/admin/update-status', {
+                headers: {
+                    'Authorization': `Bearer ${localStorage.getItem('adminToken')}`
+                }
+            });
+
+            if (!response.ok) {
+                // Application might be restarting
+                return;
+            }
+
+            const status = await response.json();
+
+            if (!status.is_updating) {
+                // Update complete
+                clearInterval(pollInterval);
+                document.getElementById('update-progress').style.display = 'none';
+                document.getElementById('update-status-text').innerHTML = '<span style="color: #4caf50;">Update Complete!</span>';
+
+                alert('Update completed successfully! Reloading dashboard...');
+
+                // Reload the page
+                setTimeout(() => {
+                    window.location.reload();
+                }, 2000);
+            }
+
+        } catch (error) {
+            // Application might be restarting, continue polling
+            console.log('Waiting for application to restart...');
+        }
+    }, 5000); // Poll every 5 seconds
+}
+
+// Check for updates on dashboard load
+if (document.getElementById('update-card')) {
+    checkForUpdates();
+}

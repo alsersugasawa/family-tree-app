@@ -155,6 +155,46 @@
                 </div>
             </div>
 
+            <div class="dashboard-card" id="update-card">
+                <h3><i class="bi bi-arrow-repeat"></i> Application Updates</h3>
+                <div style="display: flex; flex-direction: column; gap: 15px;">
+                    <div class="info-grid">
+                        <div class="info-item">
+                            <span class="label">Current Version:</span>
+                            <span id="current-version">-</span>
+                        </div>
+                        <div class="info-item">
+                            <span class="label">Latest Version:</span>
+                            <span id="latest-version">-</span>
+                        </div>
+                        <div class="info-item">
+                            <span class="label">Update Status:</span>
+                            <span id="update-status-text">Checking...</span>
+                        </div>
+                    </div>
+                    <div id="update-available-banner" style="display: none; padding: 12px; background: #fff3cd; border: 1px solid #ffc107; border-radius: 6px; color: #856404;">
+                        <i class="bi bi-exclamation-triangle"></i> <strong>Update Available!</strong>
+                        A new version is ready to install.
+                    </div>
+                    <div style="display: flex; gap: 10px; align-items: center;">
+                        <button id="check-update-btn" onclick="checkForUpdates()" class="btn-secondary" style="flex: 1;">
+                            <i class="bi bi-arrow-clockwise"></i> Check for Updates
+                        </button>
+                        <button id="install-update-btn" onclick="installUpdate()" class="btn-primary" style="flex: 1;" disabled>
+                            <i class="bi bi-download"></i> Install Update
+                        </button>
+                    </div>
+                    <div id="update-progress" style="display: none;">
+                        <div style="padding: 12px; background: #e3f2fd; border: 1px solid #2196f3; border-radius: 6px; color: #0d47a1;">
+                            <i class="bi bi-hourglass-split"></i> <strong>Update in Progress...</strong>
+                            <p style="margin: 8px 0 0 0; font-size: 13px;">
+                                A snapshot backup has been created. The application will restart automatically when the update is complete.
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
             <div class="dashboard-card">
                 <h3><i class="bi bi-diagram-3"></i> Services Layout</h3>
                 <div class="services-layout">
