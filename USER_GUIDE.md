@@ -14,7 +14,9 @@ Complete user guide for the Family Tree Web Application.
 8. [Tree Views](#tree-views)
 9. [Profile Pictures](#profile-pictures)
 10. [Admin Portal](#admin-portal)
-11. [Troubleshooting](#troubleshooting)
+11. [Docker Management](#docker-management)
+12. [Project Structure](#project-structure)
+13. [Troubleshooting](#troubleshooting)
 
 ---
 
@@ -588,6 +590,200 @@ View system statistics:
 2. Find snapshot created before update
 3. Restore from backup
 4. Restart application
+
+---
+
+## Docker Management
+
+### Managing Containers
+
+**View Running Containers**
+```bash
+docker-compose ps
+```
+
+**Rebuild After Code Changes**
+```bash
+docker-compose up -d --build
+```
+
+**View Application Logs**
+```bash
+# All logs
+docker-compose logs -f
+
+# Web application logs only
+docker-compose logs -f web
+
+# Database logs only
+docker-compose logs -f db
+```
+
+**Access Container Shell**
+```bash
+# Web application container
+docker-compose exec web bash
+
+# Database container
+docker-compose exec db bash
+```
+
+**Access PostgreSQL Database**
+```bash
+docker-compose exec db psql -U postgres -d familytree
+```
+
+**Stop Containers**
+```bash
+# Stop containers (data persists)
+docker-compose down
+
+# Stop and remove all data
+docker-compose down -v
+```
+
+**Restart Containers**
+```bash
+# Restart all containers
+docker-compose restart
+
+# Restart specific container
+docker-compose restart web
+docker-compose restart db
+```
+
+### Volume Management
+
+**View Volumes**
+```bash
+docker volume ls
+```
+
+**Backup Database Volume**
+```bash
+# Create backup
+docker-compose exec db pg_dump -U postgres familytree > backup.sql
+
+# Restore from backup
+docker-compose exec -T db psql -U postgres familytree < backup.sql
+```
+
+**Clean Up Docker**
+```bash
+# Remove unused images
+docker image prune
+
+# Remove unused volumes
+docker volume prune
+
+# Remove everything unused
+docker system prune -a
+```
+
+### Troubleshooting Docker Issues
+
+**Port Already in Use**
+```bash
+# Check what's using port 8080
+lsof -i :8080
+
+# Change port in docker-compose.yml
+ports:
+  - "8081:8000"  # Changed from 8080
+```
+
+**Database Connection Issues**
+```bash
+# Check database is running
+docker-compose ps db
+
+# View database logs
+docker-compose logs db
+
+# Restart database
+docker-compose restart db
+```
+
+**Container Won't Start**
+```bash
+# View logs for errors
+docker-compose logs web
+
+# Rebuild from scratch
+docker-compose down
+docker-compose up -d --build
+```
+
+---
+
+## Project Structure
+
+```
+my-web-app/
+├── app/
+│   ├── main.py              # FastAPI application entry point
+│   ├── database.py          # Database configuration
+│   ├── models.py            # SQLAlchemy models
+│   ├── schemas.py           # Pydantic schemas
+│   ├── auth.py              # Authentication utilities
+│   └── routers/
+│       ├── auth.py          # Authentication endpoints
+│       ├── family_tree.py   # Family member endpoints
+│       ├── family_trees.py  # Multi-tree management endpoints
+│       ├── tree_views.py    # Tree views endpoints
+│       └── admin.py         # Admin portal endpoints
+├── static/
+│   ├── index.html           # Main application page
+│   ├── styles.css           # Main CSS styling with theme variables
+│   ├── app.js               # Frontend JavaScript (D3.js visualization)
+│   ├── admin-login.html     # Admin login page
+│   ├── admin.html           # Admin dashboard
+│   ├── admin-styles.css     # Admin portal CSS
+│   └── admin.js             # Admin dashboard JavaScript
+├── migrations/
+│   ├── 001_add_tree_views.sql        # Tree views feature
+│   ├── 002_add_additional_fields.sql # Extra member fields
+│   ├── 003_add_node_positions.sql    # Draggable nodes
+│   ├── 004_add_admin_features.sql    # Admin portal
+│   ├── 005_add_view_thumbnails.sql   # View thumbnails
+│   ├── 006_add_family_trees.sql      # Multi-tree support
+│   └── 007_fix_multi_tree_data.sql   # Data migration fixes
+├── uploads/
+│   └── profile_pictures/    # Uploaded profile images
+├── backups/                 # Database backups
+├── .github/
+│   └── workflows/           # GitHub Actions CI/CD workflows
+├── Dockerfile               # Docker container configuration
+├── docker-compose.yml       # Docker Compose orchestration
+├── requirements.txt         # Python dependencies
+├── CHANGELOG.md            # Version history
+├── USER_GUIDE.md           # This file
+└── README.md               # Project overview
+```
+
+### Key Files Explained
+
+**Backend (Python/FastAPI)**
+- `app/main.py` - Application entry point, API routes registration
+- `app/database.py` - PostgreSQL connection and session management
+- `app/models.py` - Database models (User, FamilyMember, FamilyTree, etc.)
+- `app/schemas.py` - Request/response validation schemas
+- `app/auth.py` - JWT token generation and validation
+
+**Frontend (HTML/CSS/JavaScript)**
+- `static/index.html` - Main application UI
+- `static/styles.css` - Theme system with CSS variables
+- `static/app.js` - D3.js tree visualization, API calls
+- `static/admin.html` - Admin dashboard UI
+- `static/admin.js` - Admin functionality (users, backups, updates)
+
+**Database**
+- `migrations/` - SQL migration files for schema changes
+- PostgreSQL 14 - Relational database for all data
+
+**Container Configuration**
+- `Dockerfile` - Python 3.11-slim with FastAPI dependencies
+- `docker-compose.yml` - Multi-container setup (web + database)
 
 ---
 
