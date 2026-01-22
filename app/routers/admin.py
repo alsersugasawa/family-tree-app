@@ -1,13 +1,18 @@
-from fastapi import APIRouter, Depends, HTTPException, status, Request
+from fastapi import APIRouter, Depends, HTTPException, status, Request, UploadFile, File
+from fastapi.responses import FileResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func, text
-from typing import List
+from typing import List, Optional
 from datetime import datetime, timedelta
 import os
 import subprocess
 import psutil
 import shutil
 from pathlib import Path
+from cryptography.fernet import Fernet
+from cryptography.hazmat.primitives import hashes
+from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
+import base64
 from app.database import get_db
 from app.models import User, SystemLog, Backup, FamilyMember, TreeView, FamilyTree, TreeShare
 from app.schemas import (
@@ -444,6 +449,76 @@ def copy_to_file_shares(filepath: str, filename: str) -> List[str]:
     return destinations
 
 
+def generate_key_from_password(password: str, salt: bytes = None) -> tuple[bytes, bytes]:
+    """Generate encryption key from password using PBKDF2."""
+    if salt is None:
+        salt = os.urandom(16)
+
+    kdf = PBKDF2HMAC(
+        algorithm=hashes.SHA256(),
+        length=32,
+        salt=salt,
+        iterations=100000,
+    )
+    key = base64.urlsafe_b64encode(kdf.derive(password.encode()))
+    return key, salt
+
+
+def encrypt_file(filepath: str, password: str) -> str:
+    """Encrypt a file with password and return encrypted filepath."""
+    # Read the original file
+    with open(filepath, 'rb') as f:
+        data = f.read()
+
+    # Generate encryption key from password
+    key, salt = generate_key_from_password(password)
+    fernet = Fernet(key)
+
+    # Encrypt the data
+    encrypted_data = fernet.encrypt(data)
+
+    # Save encrypted file with .encrypted extension
+    encrypted_filepath = f"{filepath}.encrypted"
+    with open(encrypted_filepath, 'wb') as f:
+        # Write salt first (needed for decryption)
+        f.write(salt)
+        # Then write encrypted data
+        f.write(encrypted_data)
+
+    return encrypted_filepath
+
+
+def decrypt_file(encrypted_filepath: str, password: str) -> str:
+    """Decrypt a file with password and return decrypted filepath."""
+    # Read the encrypted file
+    with open(encrypted_filepath, 'rb') as f:
+        # Read salt (first 16 bytes)
+        salt = f.read(16)
+        # Read encrypted data
+        encrypted_data = f.read()
+
+    # Generate key from password using the same salt
+    key, _ = generate_key_from_password(password, salt)
+    fernet = Fernet(key)
+
+    # Decrypt the data
+    try:
+        decrypted_data = fernet.decrypt(encrypted_data)
+    except Exception as e:
+        raise ValueError("Incorrect password or corrupted file")
+
+    # Save decrypted file (remove .encrypted extension)
+    if encrypted_filepath.endswith('.encrypted'):
+        decrypted_filepath = encrypted_filepath[:-10]  # Remove .encrypted
+    else:
+        decrypted_filepath = f"{encrypted_filepath}.decrypted"
+
+    with open(decrypted_filepath, 'wb') as f:
+        f.write(decrypted_data)
+
+    return decrypted_filepath
+
+
 @router.post("/backups", response_model=BackupResponse)
 async def create_backup(
     backup_data: BackupCreate,
@@ -529,6 +604,159 @@ async def create_backup(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Backup creation failed: {str(e)}"
         )
+
+
+@router.get("/backups/{backup_id}/download")
+async def download_backup(
+    backup_id: int,
+    password: Optional[str] = None,
+    current_admin: User = Depends(get_current_admin_user),
+    db: AsyncSession = Depends(get_db)
+):
+    """Download a backup file, optionally encrypted with password."""
+    # Get backup record
+    result = await db.execute(select(Backup).where(Backup.id == backup_id))
+    backup = result.scalar_one_or_none()
+
+    if not backup:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Backup not found"
+        )
+
+    # Construct file path
+    filepath = os.path.join(backup_settings.backup_dir, backup.filename)
+
+    if not os.path.exists(filepath):
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Backup file not found on disk"
+        )
+
+    # If password provided, encrypt the file first
+    if password:
+        try:
+            encrypted_filepath = encrypt_file(filepath, password)
+            download_filepath = encrypted_filepath
+            download_filename = f"{backup.filename}.encrypted"
+
+            # Log the action
+            await log_action(
+                db, "INFO", f"Backup {backup.filename} downloaded (encrypted)",
+                user_id=current_admin.id, action="backup_download",
+                details={"backup_id": backup_id, "encrypted": True}
+            )
+        except Exception as e:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"Encryption failed: {str(e)}"
+            )
+    else:
+        download_filepath = filepath
+        download_filename = backup.filename
+
+        # Log the action
+        await log_action(
+            db, "INFO", f"Backup {backup.filename} downloaded",
+            user_id=current_admin.id, action="backup_download",
+            details={"backup_id": backup_id, "encrypted": False}
+        )
+
+    # Return file for download
+    return FileResponse(
+        path=download_filepath,
+        filename=download_filename,
+        media_type="application/octet-stream"
+    )
+
+
+@router.post("/backups/restore")
+async def restore_backup(
+    backup_file: UploadFile = File(...),
+    password: Optional[str] = None,
+    request: Request = None,
+    current_admin: User = Depends(get_current_admin_user),
+    db: AsyncSession = Depends(get_db)
+):
+    """Restore database from uploaded backup file."""
+    temp_dir = backup_settings.backup_dir
+    os.makedirs(temp_dir, exist_ok=True)
+
+    # Save uploaded file
+    temp_filepath = os.path.join(temp_dir, f"restore_temp_{datetime.utcnow().strftime('%Y%m%d_%H%M%S')}.sql")
+
+    try:
+        # Write uploaded file to disk
+        with open(temp_filepath, 'wb') as f:
+            content = await backup_file.read()
+            f.write(content)
+
+        # If file is encrypted, decrypt it first
+        restore_filepath = temp_filepath
+        if password or temp_filepath.endswith('.encrypted'):
+            if not password:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Password required for encrypted backup"
+                )
+
+            try:
+                restore_filepath = decrypt_file(temp_filepath, password)
+            except ValueError as e:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=str(e)
+                )
+
+        # Restore database using psql
+        result = subprocess.run(
+            [
+                "psql",
+                "-h", "db",
+                "-U", "postgres",
+                "-d", "familytree",
+                "-f", restore_filepath
+            ],
+            env={**os.environ, "PGPASSWORD": "postgres"},
+            capture_output=True,
+            text=True
+        )
+
+        if result.returncode != 0:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"Database restore failed: {result.stderr}"
+            )
+
+        # Log the action
+        await log_action(
+            db, "WARNING", f"Database restored from uploaded backup",
+            user_id=current_admin.id, action="backup_restored",
+            details={
+                "filename": backup_file.filename,
+                "encrypted": bool(password)
+            },
+            ip_address=request.client.host if request else None
+        )
+
+        return {
+            "message": "Database restored successfully",
+            "filename": backup_file.filename
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Restore failed: {str(e)}"
+        )
+    finally:
+        # Clean up temporary files
+        if os.path.exists(temp_filepath):
+            os.remove(temp_filepath)
+        if password and restore_filepath != temp_filepath and os.path.exists(restore_filepath):
+            os.remove(restore_filepath)
 
 
 @router.get("/system-info")

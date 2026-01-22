@@ -407,10 +407,13 @@ On first run, you'll need to create an admin account:
 
 **Backup Management**
 - Create database backups with one click
+- Download backups directly to your local machine
+- Optional AES-256 encryption for downloaded backups with password protection
+- Restore database from backup files (encrypted or unencrypted)
 - View all backups with sizes, dates, and status
 - Backup history tracking
 - Configurable backup locations:
-  - Local disk storage (default: `/data/backups`)
+  - Local disk storage (default: `/app/backups`)
   - SMB/CIFS file share support
   - NFS file share support
 - Automatic backup copying to configured file shares
@@ -499,12 +502,45 @@ To enable automatic backup copying to an NFS share:
 
 ### How Backups Work
 
+#### Creating Backups
 1. When you create a backup via the admin portal:
    - Primary backup is saved to `BACKUP_DIR` (default: `/app/backups`)
    - If SMB is enabled and mounted, a copy is sent to the SMB share
    - If NFS is enabled and mounted, a copy is sent to the NFS share
 2. Backup status and file share destinations are logged in system logs
 3. All backups are tracked in the database with metadata
+
+#### Downloading Backups
+From the admin portal, you can download backups with optional encryption:
+
+1. **Standard Download**: Click the "Download" button to download the backup file directly to your local machine
+2. **Encrypted Download**:
+   - Check "Encrypt backup with password" in the download dialog
+   - Enter a strong password
+   - The backup will be encrypted using AES-256 encryption (Fernet) before download
+   - **Important**: Remember this password - you will need it to restore the backup!
+   - Encrypted backups have a `.encrypted` extension
+
+#### Restoring Backups
+To restore a database from a backup:
+
+1. Click the "Restore Backup" button in the admin portal
+2. Select your backup file (`.sql` or `.sql.encrypted`)
+3. If the backup is encrypted:
+   - Check "Backup is encrypted"
+   - Enter the decryption password
+4. Confirm the restore operation
+5. The database will be restored to the state captured in the backup
+
+**⚠️ Warning**: Restoring a backup will overwrite all current data. This cannot be undone. Always create a fresh backup before restoring.
+
+#### Security Best Practices
+- **Always encrypt backups** when downloading for offsite storage
+- Use strong, unique passwords for encrypted backups
+- Store backup passwords securely (password manager recommended)
+- Test your backups regularly by restoring to a development environment
+- Keep multiple backup versions with different timestamps
+- Store backups in multiple locations (local + SMB/NFS shares)
 
 **Note**: The `/app/backups` directory is created with proper permissions in the Docker container and is owned by the `appuser` non-root user for security.
 

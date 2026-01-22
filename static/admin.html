@@ -259,7 +259,12 @@
     <div id="backups-section" class="content-section">
         <div class="section-header">
             <h2>Backup Management</h2>
-            <button onclick="createBackup()" class="btn-primary">+ Create Backup</button>
+            <div>
+                <button onclick="openRestoreBackupModal()" class="btn-secondary" style="margin-right: 10px;">
+                    <i class="bi bi-upload"></i> Restore Backup
+                </button>
+                <button onclick="createBackup()" class="btn-primary">+ Create Backup</button>
+            </div>
         </div>
 
         <div class="table-container">
@@ -351,6 +356,67 @@
                     <button type="submit" class="btn-primary">Save Changes</button>
                 </div>
             </form>
+        </div>
+    </div>
+
+    <!-- Download Backup Modal -->
+    <div id="download-backup-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Download Backup</h3>
+                <button onclick="closeDownloadBackupModal()" class="btn-close">&times;</button>
+            </div>
+            <div class="modal-body">
+                <p>Download backup: <strong id="download-backup-filename"></strong></p>
+                <div class="form-group">
+                    <label>
+                        <input type="checkbox" id="encrypt-download-checkbox" onchange="toggleEncryptPassword()">
+                        Encrypt backup with password
+                    </label>
+                </div>
+                <div class="form-group" id="encrypt-password-group" style="display: none;">
+                    <label>Encryption Password *</label>
+                    <input type="password" id="encrypt-password" placeholder="Enter password to encrypt backup">
+                    <small>Remember this password - it will be required to restore this backup!</small>
+                </div>
+            </div>
+            <div class="form-actions">
+                <button type="button" onclick="closeDownloadBackupModal()" class="btn-secondary">Cancel</button>
+                <button type="button" onclick="confirmDownloadBackup()" class="btn-primary">Download</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Restore Backup Modal -->
+    <div id="restore-backup-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>⚠️ Restore Database Backup</h3>
+                <button onclick="closeRestoreBackupModal()" class="btn-close">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="alert alert-warning">
+                    <strong>Warning:</strong> Restoring a backup will overwrite the current database. This action cannot be undone. Make sure you have a recent backup before proceeding.
+                </div>
+                <div class="form-group">
+                    <label>Select Backup File *</label>
+                    <input type="file" id="restore-file" accept=".sql,.encrypted" required>
+                </div>
+                <div class="form-group">
+                    <label>
+                        <input type="checkbox" id="is-encrypted-checkbox" onchange="toggleDecryptPassword()">
+                        Backup is encrypted
+                    </label>
+                </div>
+                <div class="form-group" id="decrypt-password-group" style="display: none;">
+                    <label>Decryption Password *</label>
+                    <input type="password" id="decrypt-password" placeholder="Enter password to decrypt backup">
+                </div>
+            </div>
+            <div class="form-actions">
+                <button type="button" onclick="closeRestoreBackupModal()" class="btn-secondary">Cancel</button>
+                <button type="button" onclick="confirmRestoreBackup()" class="btn-danger">Restore Database</button>
+            </div>
         </div>
     </div>
 

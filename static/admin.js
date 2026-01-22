@@ -400,7 +400,9 @@ async function loadBackups() {
                 <td><span class="badge badge-${backup.status === 'completed' ? 'success' : 'warning'}">${backup.status}</span></td>
                 <td>${formatDateTime(backup.created_at)}</td>
                 <td>
-                    <button class="btn-sm btn-edit" onclick="downloadBackup('${backup.filename}')">Download</button>
+                    <button class="btn-sm btn-edit" onclick="openDownloadBackupModal(${backup.id}, '${backup.filename}')">
+                        <i class="bi bi-download"></i> Download
+                    </button>
                 </td>
             </tr>
         `).join('');
@@ -439,9 +441,156 @@ async function createBackup() {
     }
 }
 
-function downloadBackup(filename) {
-    // Note: This would need a download endpoint in the backend
-    alert(`Download functionality for ${filename} - Backend endpoint needed`);
+// Backup Download Modal Functions
+let currentDownloadBackupId = null;
+
+function openDownloadBackupModal(backupId, filename) {
+    currentDownloadBackupId = backupId;
+    document.getElementById('download-backup-filename').textContent = filename;
+    document.getElementById('encrypt-download-checkbox').checked = false;
+    document.getElementById('encrypt-password').value = '';
+    document.getElementById('encrypt-password-group').style.display = 'none';
+    document.getElementById('download-backup-modal').style.display = 'flex';
+}
+
+function closeDownloadBackupModal() {
+    document.getElementById('download-backup-modal').style.display = 'none';
+    currentDownloadBackupId = null;
+}
+
+function toggleEncryptPassword() {
+    const checkbox = document.getElementById('encrypt-download-checkbox');
+    const passwordGroup = document.getElementById('encrypt-password-group');
+    passwordGroup.style.display = checkbox.checked ? 'block' : 'none';
+}
+
+async function confirmDownloadBackup() {
+    const encryptCheckbox = document.getElementById('encrypt-download-checkbox');
+    const password = document.getElementById('encrypt-password').value;
+
+    if (encryptCheckbox.checked && !password) {
+        alert('Please enter an encryption password');
+        return;
+    }
+
+    try {
+        // Build URL with optional password parameter
+        let url = `${API_BASE}/api/admin/backups/${currentDownloadBackupId}/download`;
+        if (encryptCheckbox.checked && password) {
+            url += `?password=${encodeURIComponent(password)}`;
+        }
+
+        // Fetch the file
+        const response = await fetch(url, {
+            headers: {
+                'Authorization': `Bearer ${adminToken}`
+            }
+        });
+
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.detail || 'Failed to download backup');
+        }
+
+        // Get filename from Content-Disposition header or use default
+        const contentDisposition = response.headers.get('content-disposition');
+        let filename = 'backup.sql';
+        if (contentDisposition) {
+            const match = contentDisposition.match(/filename="?(.+?)"?$/);
+            if (match) filename = match[1];
+        }
+
+        // Download the file
+        const blob = await response.blob();
+        const downloadUrl = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = downloadUrl;
+        a.download = filename;
+        document.body.appendChild(a);
+        a.click();
+        window.URL.revokeObjectURL(downloadUrl);
+        document.body.removeChild(a);
+
+        closeDownloadBackupModal();
+
+        if (encryptCheckbox.checked) {
+            alert('Encrypted backup downloaded successfully! Remember your password - you will need it to restore this backup.');
+        }
+
+    } catch (error) {
+        alert(error.message);
+    }
+}
+
+// Restore Backup Modal Functions
+function openRestoreBackupModal() {
+    document.getElementById('restore-file').value = '';
+    document.getElementById('is-encrypted-checkbox').checked = false;
+    document.getElementById('decrypt-password').value = '';
+    document.getElementById('decrypt-password-group').style.display = 'none';
+    document.getElementById('restore-backup-modal').style.display = 'flex';
+}
+
+function closeRestoreBackupModal() {
+    document.getElementById('restore-backup-modal').style.display = 'none';
+}
+
+function toggleDecryptPassword() {
+    const checkbox = document.getElementById('is-encrypted-checkbox');
+    const passwordGroup = document.getElementById('decrypt-password-group');
+    passwordGroup.style.display = checkbox.checked ? 'block' : 'none';
+}
+
+async function confirmRestoreBackup() {
+    const fileInput = document.getElementById('restore-file');
+    const isEncrypted = document.getElementById('is-encrypted-checkbox').checked;
+    const password = document.getElementById('decrypt-password').value;
+
+    if (!fileInput.files || fileInput.files.length === 0) {
+        alert('Please select a backup file');
+        return;
+    }
+
+    if (isEncrypted && !password) {
+        alert('Please enter the decryption password');
+        return;
+    }
+
+    if (!confirm('⚠️ WARNING: This will restore the database and overwrite all current data. This cannot be undone. Are you sure you want to continue?')) {
+        return;
+    }
+
+    try {
+        const formData = new FormData();
+        formData.append('backup_file', fileInput.files[0]);
+        if (isEncrypted && password) {
+            formData.append('password', password);
+        }
+
+        const response = await fetch(`${API_BASE}/api/admin/backups/restore`, {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${adminToken}`
+            },
+            body: formData
+        });
+
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.detail || 'Failed to restore backup');
+        }
+
+        const result = await response.json();
+        alert(`Database restored successfully from ${result.filename}`);
+        closeRestoreBackupModal();
+
+        // Reload dashboard data
+        loadDashboard();
+        loadBackups();
+
+    } catch (error) {
+        alert(error.message);
+    }
 }
 
 // Utility Functions
