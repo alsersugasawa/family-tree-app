@@ -1,5 +1,7 @@
 from datetime import datetime, timedelta
 from typing import Optional
+import os
+import secrets
 from jose import JWTError, jwt
 from passlib.context import CryptContext
 from fastapi import Depends, HTTPException, status
@@ -9,11 +11,31 @@ from sqlalchemy import select
 from app.database import get_db
 from app.models import User
 
-SECRET_KEY = "your-secret-key-change-this-in-production"
-ALGORITHM = "HS256"
-ACCESS_TOKEN_EXPIRE_MINUTES = 60 * 24  # 24 hours
+# Security Configuration - ISO 27001 A.9.4.3, NIST SP 800-53 IA-5, OWASP ASVS 2.6.3
+# Generate secure SECRET_KEY if not provided
+def get_secret_key() -> str:
+    """Get SECRET_KEY from environment or generate secure one."""
+    secret = os.getenv("SECRET_KEY")
+    if not secret or secret == "your-secret-key-change-this-in-production":
+        # Generate cryptographically secure random key
+        # CRITICAL: In production, set SECRET_KEY in environment variables
+        print("WARNING: Using generated SECRET_KEY. Set SECRET_KEY environment variable in production!")
+        return secrets.token_urlsafe(32)
+    return secret
 
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+SECRET_KEY = get_secret_key()
+ALGORITHM = "HS256"
+
+# Session timeout aligned with ISO 27001 A.9.4.2, NIST SP 800-53 AC-12
+ACCESS_TOKEN_EXPIRE_MINUTES = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", "30"))
+
+# Password hashing with bcrypt (NIST SP 800-63B, OWASP ASVS 2.4.1)
+# Bcrypt automatically uses salt and has configurable work factor
+pwd_context = CryptContext(
+    schemes=["bcrypt"],
+    deprecated="auto",
+    bcrypt__rounds=12  # Work factor (OWASP ASVS 2.4.2)
+)
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="api/auth/login")
 
 
