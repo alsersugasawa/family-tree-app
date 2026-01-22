@@ -81,24 +81,7 @@
             </div>
             <button onclick="showAddMemberForm()" class="btn-primary">Add Family Member</button>
             <button onclick="resetTreeView()" class="btn-secondary">Reset View</button>
-
-            <!-- Highlight Descendants Feature -->
-            <div class="highlight-controls" style="display: inline-flex; align-items: center; gap: 10px; margin-left: 10px; padding: 5px 10px; background: #f8f9fa; border-radius: 5px; border: 1px solid #dee2e6;">
-                <label style="margin: 0; font-weight: 500;">
-                    <input type="checkbox" id="highlight-mode" onchange="toggleHighlightMode(this.checked)" style="margin-right: 5px;">
-                    Highlight Descendants
-                </label>
-                <select id="highlight-person-select" style="padding: 5px 10px; border-radius: 4px; border: 1px solid #ced4da;" disabled onchange="highlightDescendants(this.value)">
-                    <option value="">Select person...</option>
-                </select>
-                <button onclick="exportHighlightedPDF()" class="btn-icon" title="Export Highlighted PDF" id="export-highlight-pdf" disabled><i class="bi bi-file-pdf"></i></button>
-                <button onclick="exportHighlightedJPEG()" class="btn-icon" title="Export Highlighted JPEG" id="export-highlight-jpeg" disabled><i class="bi bi-file-image"></i></button>
-            </div>
-
-            <button onclick="exportToCSV()" class="btn-secondary">Export CSV</button>
             <button onclick="showImportCSVModal()" class="btn-secondary">Import CSV</button>
-            <button onclick="exportToPDF()" class="btn-secondary">Export PDF</button>
-            <button onclick="exportToJPEG()" class="btn-secondary">Export JPEG</button>
         </div>
 
         <!-- Family Summary -->
@@ -172,11 +155,24 @@
             <div id="node-tooltip" class="node-tooltip"></div>
             <!-- Context Menu -->
             <div id="context-menu" class="context-menu" style="display: none;">
+                <div class="context-menu-item" onclick="contextMenuHighlightDescendants()">
+                    <i class="bi bi-diagram-3"></i> Highlight Descendants
+                </div>
                 <div class="context-menu-item" onclick="contextMenuViewDetails()">
                     <i class="bi bi-person-circle"></i> View Details
                 </div>
                 <div class="context-menu-item" onclick="contextMenuEditMember()">
                     <i class="bi bi-pencil"></i> Edit Member
+                </div>
+                <div class="context-menu-divider"></div>
+                <div class="context-menu-item" onclick="contextMenuExportJPEG()">
+                    <i class="bi bi-file-earmark-image"></i> Export as JPEG
+                </div>
+                <div class="context-menu-item" onclick="contextMenuExportPDF()">
+                    <i class="bi bi-file-earmark-pdf"></i> Export as PDF
+                </div>
+                <div class="context-menu-item" onclick="contextMenuExportCSV()">
+                    <i class="bi bi-file-earmark-spreadsheet"></i> Export as CSV
                 </div>
             </div>
         </div>

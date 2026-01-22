@@ -2148,6 +2148,20 @@ function hideContextMenu() {
     document.removeEventListener('click', hideContextMenu);
 }
 
+function contextMenuHighlightDescendants() {
+    if (contextMenuMember) {
+        // Update the toolbar dropdown to show the selected person
+        const toolbarSelect = document.getElementById('highlight-person-select-toolbar');
+        if (toolbarSelect) {
+            toolbarSelect.value = contextMenuMember.id;
+        }
+
+        // Trigger the highlight
+        highlightDescendants(contextMenuMember.id);
+    }
+    hideContextMenu();
+}
+
 function contextMenuViewDetails() {
     if (contextMenuMember) {
         showMemberDetails(contextMenuMember.id);
@@ -2160,6 +2174,21 @@ function contextMenuEditMember() {
         editMember(contextMenuMember.id);
     }
     hideContextMenu();
+}
+
+function contextMenuExportJPEG() {
+    hideContextMenu();
+    exportTreeAsImage();
+}
+
+function contextMenuExportPDF() {
+    hideContextMenu();
+    exportTreeAsPDF();
+}
+
+function contextMenuExportCSV() {
+    hideContextMenu();
+    exportDataCSV();
 }
 
 async function exportHighlightedPDF() {
