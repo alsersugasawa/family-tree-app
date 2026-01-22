@@ -1,6 +1,6 @@
-# Family Tree Web Application v3.0.0
+# Family Tree Web Application v4.0.0
 
-A full-stack web application for creating and managing interactive family trees with multi-tree support, sharing, and comprehensive admin dashboard.
+A full-stack web application for creating and managing interactive family trees with multi-tree support, sharing, theme customization, and comprehensive admin dashboard.
 
 ## Features
 
@@ -8,27 +8,30 @@ A full-stack web application for creating and managing interactive family trees 
 - **User authentication** (register/login with JWT tokens)
 - **Multiple family trees** - Create unlimited trees per user
 - **Tree sharing** - Share trees with other users (view or edit permissions)
+- **Theme customization** - Light, Dark, and System Default modes
 - **Profile pictures** - Upload photos with gender-specific colored borders
 - **Interactive visualization** - D3.js-powered family tree with zoom/pan
 - **Draggable nodes** - Customize layouts with preserved relationships
+- **Context menu** - Right-click actions for tree nodes
 - **Hover tooltips** - View member info on node hover
 - Parent-child relationships tracking
 - Detailed member profiles with biography, dates, locations, and social media links
 
 ### Data Management
-- **CSV export/import** - Backup and migrate family tree data
-- **PDF and JPEG export** - Save tree views as high-quality images
+- **CSV export** - Backup and export family tree data
+- **PDF and JPEG export** - Save tree views as high-quality images from context menu
 - **Multiple saved views** - Create and manage different tree layouts
-- **Highlight descendants** - Visual highlighting of family lineages
+- **Highlight descendants** - Visual highlighting of family lineages via dropdown or context menu
 - Account settings with email/password management
 
 ### Admin Portal
 - **Dashboard statistics** - Users, trees, members, shares, active users
 - **System monitoring** - Real-time CPU, RAM, and disk usage
 - **Services overview** - Web app, database, and file storage status
+- **Application updates** - Check for and install updates from GitHub releases
 - **User management** - Create, edit, delete users
 - **Activity logs** - Track all system actions
-- **Database backups** - One-click backup creation
+- **Database backups** - One-click backup creation with automatic snapshots before updates
 
 ### Responsive Design
 - Mobile-friendly interface
@@ -248,22 +251,28 @@ my-web-app/
 ├── CHANGELOG.md            # Version history
 └── README.md               # This file
 ```
-## What's New in v3.0.0
+## What's New in v4.0.0
 
 This major release introduces:
 
-- **Multi-Tree Management**: Create, rename, copy, delete, and share unlimited family trees
-- **Tree Sharing**: Share trees with other users with view or edit permissions
-- **Profile Pictures**: Upload photos with gender-specific colored borders
-- **Hover Tooltips**: See member info on node hover
-- **Enhanced Admin Dashboard**:
-  - Active users tracking
-  - Family trees and shares count
-  - Real-time system monitoring (CPU, RAM, Disk)
-  - Services status overview with animations
-- **Bug Fixes**: Fixed data migration issues, timestamp validation, and SQLAlchemy relationships
+- **Theme System**: Light, Dark, and System Default modes for both web app and admin portal
+  - CSS variables for seamless theme transitions
+  - localStorage persistence across sessions
+  - Automatic system preference detection
+  - Real-time theme change listeners
+- **Enhanced UI/UX**:
+  - Context menu for tree nodes (right-click actions)
+  - Export options (JPEG, PDF, CSV) in context menu
+  - Diagram toolbar with zoom controls and export buttons
+  - Improved visual consistency across all components
+- **Automated Release System**:
+  - Three-tier GitHub Actions workflows (test, minor, major releases)
+  - Automatic version updates and changelog generation
+  - Docker image tagging and publishing
+  - In-app update system with automatic backups
+- **Documentation**: Comprehensive release guides and update instructions
 
-See [CHANGELOG.md](CHANGELOG.md) for complete details.
+See [CHANGELOG.md](CHANGELOG.md) for complete details and [USER_GUIDE.md](USER_GUIDE.md) for usage instructions.
 
 ## Future Enhancements
 

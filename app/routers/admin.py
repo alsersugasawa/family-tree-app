@@ -28,7 +28,7 @@ from app.config import backup_settings
 
 router = APIRouter(prefix="/api/admin", tags=["admin"])
 
-APP_VERSION = "3.0.0"
+APP_VERSION = "4.0.0"
 START_TIME = datetime.utcnow()
 
 

@@ -3044,3 +3044,66 @@ async function renameTree(event) {
         errorDiv.textContent = 'Error: ' + error.message;
     }
 }
+
+// ============================================
+// Theme Management
+// ============================================
+
+/**
+ * Initialize theme on page load
+ */
+function initializeTheme() {
+    const savedTheme = localStorage.getItem('theme') || 'system';
+    const themeSelect = document.getElementById('theme-select');
+
+    if (themeSelect) {
+        themeSelect.value = savedTheme;
+    }
+
+    applyTheme(savedTheme);
+
+    // Listen for system theme changes
+    if (window.matchMedia) {
+        window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => {
+            const currentTheme = localStorage.getItem('theme') || 'system';
+            if (currentTheme === 'system') {
+                applyTheme('system');
+            }
+        });
+    }
+}
+
+/**
+ * Change theme based on user selection
+ */
+function changeTheme(theme) {
+    localStorage.setItem('theme', theme);
+    applyTheme(theme);
+}
+
+/**
+ * Apply theme to the document
+ */
+function applyTheme(theme) {
+    const root = document.documentElement;
+
+    if (theme === 'system') {
+        // Detect system preference
+        if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
+            root.setAttribute('data-theme', 'dark');
+        } else {
+            root.removeAttribute('data-theme');
+        }
+    } else if (theme === 'dark') {
+        root.setAttribute('data-theme', 'dark');
+    } else {
+        root.removeAttribute('data-theme');
+    }
+}
+
+// Initialize theme when DOM loads
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initializeTheme);
+} else {
+    initializeTheme();
+}

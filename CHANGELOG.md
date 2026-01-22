@@ -5,6 +5,226 @@ All notable changes to the Family Tree App will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.0.0] - 2026-01-22
+
+### Added - Theme System
+- **Light, Dark, and System Default Modes**
+  - Complete theme customization for both web app and admin portal
+  - CSS variables for seamless theme transitions
+  - Light mode (default) with clean, bright colors
+  - Dark mode with comfortable, low-contrast colors
+  - System Default mode that follows OS preferences
+
+- **Theme Switcher Component**
+  - Dropdown in main app header with three theme options
+  - Dropdown in admin portal navigation bar
+  - Consistent UI across both portals
+  - Bootstrap icon for visual clarity
+
+- **Theme Persistence**
+  - localStorage integration for preference saving
+  - Persists across sessions and page refreshes
+  - Shared preference between main app and admin portal
+  - Automatic theme restoration on page load
+
+- **System Preference Detection**
+  - `prefers-color-scheme` media query integration
+  - Real-time system theme change listeners
+  - Automatic theme switching when OS changes theme
+  - Works on macOS, Windows, Linux, iOS, Android
+
+- **Comprehensive Theme Coverage**
+  - All UI components themed: headers, toolbars, modals, forms
+  - Context menus with theme-aware colors
+  - Tables, cards, and stat displays
+  - Buttons, inputs, and dropdowns
+  - Borders, shadows, and backgrounds
+  - Smooth 0.3s transitions between themes
+
+### Added - Enhanced UI/UX
+- **Context Menu for Tree Nodes**
+  - Right-click actions on any tree node
+  - Highlight Descendants option
+  - View Details and Edit Member actions
+  - Export options: JPEG, PDF, CSV
+  - Fixed positioning with viewport-relative coordinates
+  - Prevents menu from appearing outside viewport
+
+- **Diagram Toolbar**
+  - Top-right toolbar with grouped controls
+  - Zoom controls: In, Out, Reset
+  - Highlight descendants dropdown with clear button
+  - Export buttons: JPEG, PDF, CSV
+  - Professional Bootstrap icons
+  - Smooth hover animations
+
+- **Removed Features (Consolidated)**
+  - Import CSV feature removed
+  - Redundant sidebar buttons removed
+  - All functionality moved to toolbar and context menu
+
+### Added - Automated Release System
+- **Three-Tier GitHub Actions Workflows**
+  - **Test Branch Workflow** (`test-branch.yml`)
+    - Runs on push to `test` branch
+    - Executes tests, linting, and Docker build
+    - No version change or release created
+    - Continuous integration for development
+
+  - **Minor Release Workflow** (`minor-release.yml`)
+    - Triggered by tags matching `v[0-9]+.[0-9]+.[0-9]+` (e.g., v1.0.2)
+    - For bug fixes and security patches
+    - Increments patch number only
+    - Auto-generates changelog from commits
+    - Tags Docker images: latest, v1.0.2, minor-latest
+
+  - **Major Release Workflow** (`major-release.yml`)
+    - Triggered by tags matching `v[0-9]+.0.0` (e.g., v2.0.0)
+    - For new features and breaking changes
+    - Resets minor and patch to 0
+    - Comprehensive changelog with sections
+    - Tags Docker images: latest, v2.0.0, v2, major-latest
+
+- **Automatic Version Updates**
+  - Workflows update APP_VERSION in code
+  - Git commits with version bump
+  - Prevents manual version management
+
+- **Intelligent Changelog Generation**
+  - Minor releases: Searches for "fix", "bug", "security" keywords
+  - Major releases: Categorizes into features, fixes, breaking changes
+  - Includes installation instructions
+  - Lists rollback procedures
+
+### Added - In-App Update System
+- **Update Button in Admin Portal**
+  - Check for updates from GitHub releases
+  - Display current vs. latest version
+  - One-click update installation
+  - Progress monitoring during update
+
+- **Automatic Snapshot Backups**
+  - Database snapshot created before every update
+  - Timestamped backup files
+  - Stored in backups directory
+  - Enables rollback if needed
+
+- **Zero-Downtime Updates**
+  - Git pull from main branch
+  - Dependency installation
+  - Database migrations via Alembic
+  - Automatic application restart
+  - No data loss guarantee
+
+- **Update API Endpoints** ([app/routers/admin.py](app/routers/admin.py))
+  - `GET /api/admin/version` - Check for updates
+  - `POST /api/admin/update` - Trigger update
+  - `GET /api/admin/update-status` - Monitor progress
+
+### Added - Comprehensive Documentation
+- **Release Process Documentation**
+  - [RELEASE_PROCESS.md](RELEASE_PROCESS.md) - Complete release workflows
+  - [RELEASE_QUICK_REFERENCE.md](.github/RELEASE_QUICK_REFERENCE.md) - Quick command reference
+  - When to use each release type
+  - Version numbering rules
+  - Commit message conventions
+  - Rollback procedures
+
+- **Update Guides**
+  - [UPDATE_GUIDE.md](UPDATE_GUIDE.md) - Comprehensive update instructions
+  - [UPDATE_INSTRUCTIONS.md](.github/UPDATE_INSTRUCTIONS.md) - Quick update reference
+  - Three update methods: Admin Portal, Manual, CI/CD
+  - Safety features and rollback steps
+
+- **User Guide**
+  - Complete user documentation (see USER_GUIDE.md)
+  - Getting started tutorials
+  - Feature explanations with screenshots
+  - Admin portal guide
+  - Troubleshooting section
+
+### Changed
+- Application version updated from 3.0.0 to 4.0.0 across all files
+- Theme switcher replaces static color scheme
+- Context menu replaces redundant sidebar buttons
+- Export functionality consolidated in toolbar and context menu
+- Admin portal now shows theme switcher
+
+### Technical Details
+- **Theme Implementation** ([static/styles.css](static/styles.css), [static/admin-styles.css](static/admin-styles.css))
+  - CSS custom properties for all colors
+  - `:root` for light theme (default)
+  - `[data-theme="dark"]` for dark theme
+  - Transition animations on theme change
+  - No page reload required
+
+- **Theme Management JavaScript** ([static/app.js](static/app.js), [static/admin.js](static/admin.js))
+  - `initializeTheme()` - Load saved preference
+  - `changeTheme(theme)` - Save to localStorage
+  - `applyTheme(theme)` - Set data-theme attribute
+  - System preference detection and listeners
+
+- **Context Menu Implementation** ([static/app.js](static/app.js))
+  - Event handlers for right-click on nodes
+  - Fixed positioning with clientX/clientY
+  - 5px offset to prevent immediate hover
+  - Click-outside to close
+  - Functions: `showContextMenu()`, `hideContextMenu()`, action handlers
+
+- **Release Automation**
+  - GitHub Actions workflows in `.github/workflows/`
+  - Semantic versioning validation
+  - Docker buildx for multi-platform images
+  - GitHub release API integration
+  - Tag-based workflow triggering
+
+### UI/UX Improvements
+- Smooth theme transitions across all components
+- Improved readability in dark mode
+- Context menu for efficient node interactions
+- Consolidated toolbar reduces UI clutter
+- Professional icon set (Bootstrap Icons)
+- Responsive design maintained in all themes
+
+### Security
+- Theme preference stored client-side only
+- No server-side theme processing
+- Update system requires admin authentication
+- Automatic backups before updates
+- Rollback capability for failed updates
+
+### Breaking Changes
+- Import CSV feature removed (export still available)
+- Theme replaces hard-coded color schemes
+- Some sidebar controls moved to toolbar/context menu
+
+### Migration Guide - Upgrading to 4.0.0 from 3.x
+1. **Pull latest changes from repository**
+   ```bash
+   git pull origin main
+   ```
+
+2. **No database migrations required for this version**
+
+3. **Rebuild and restart containers**
+   ```bash
+   docker-compose down
+   docker-compose up -d --build
+   ```
+
+4. **Verify new features**
+   - Theme switcher in header (both app and admin)
+   - Right-click context menu on tree nodes
+   - Diagram toolbar in top-right corner
+   - Check for updates in admin portal
+
+5. **Configure GitHub Repository (Optional)**
+   - Update GitHub org/repo in `app/routers/admin.py:576`
+   - Add Docker Hub secrets for image publishing (optional)
+
+### Known Issues
+- None reported for this version
+
 ## [3.0.0] - 2026-01-20
 
 ### Added - Multi-Tree Management System
