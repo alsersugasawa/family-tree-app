@@ -425,6 +425,35 @@ async def list_backups(
     return backups
 
 
+@router.get("/backup-config")
+async def get_backup_config(
+    current_admin: User = Depends(get_current_admin_user)
+):
+    """Get backup configuration status including enabled destinations"""
+    return {
+        "local": {
+            "enabled": True,
+            "path": backup_settings.backup_dir,
+            "status": "active"
+        },
+        "smb": {
+            "enabled": backup_settings.smb_enabled,
+            "host": backup_settings.smb_host if backup_settings.smb_enabled else None,
+            "share": backup_settings.smb_share if backup_settings.smb_enabled else None,
+            "mount_point": backup_settings.smb_mount_point if backup_settings.smb_enabled else None,
+            "status": "active" if (backup_settings.smb_enabled and os.path.ismount(backup_settings.smb_mount_point)) else "not_mounted" if backup_settings.smb_enabled else "disabled"
+        },
+        "nfs": {
+            "enabled": backup_settings.nfs_enabled,
+            "host": backup_settings.nfs_host if backup_settings.nfs_enabled else None,
+            "export": backup_settings.nfs_export if backup_settings.nfs_enabled else None,
+            "mount_point": backup_settings.nfs_mount_point if backup_settings.nfs_enabled else None,
+            "status": "active" if (backup_settings.nfs_enabled and os.path.ismount(backup_settings.nfs_mount_point)) else "not_mounted" if backup_settings.nfs_enabled else "disabled"
+        },
+        "retention_days": backup_settings.retention_days
+    }
+
+
 def copy_to_file_shares(filepath: str, filename: str) -> List[str]:
     """Copy backup to configured file shares (SMB and NFS)."""
     destinations = []

@@ -67,6 +67,7 @@ function showSection(sectionName) {
             loadLogs();
             break;
         case 'backups':
+            loadBackupConfig();
             loadBackups();
             break;
     }
@@ -374,6 +375,95 @@ async function loadLogs() {
 }
 
 // Backup Functions
+async function loadBackupConfig() {
+    try {
+        const response = await fetch(`${API_BASE}/api/admin/backup-config`, {
+            headers: {
+                'Authorization': `Bearer ${adminToken}`
+            }
+        });
+
+        if (!response.ok) throw new Error('Failed to load backup configuration');
+
+        const config = await response.json();
+        const contentDiv = document.getElementById('backup-destinations-content');
+
+        // Build destination cards HTML
+        let html = '';
+
+        // Local Disk Card (Always Active)
+        html += `
+            <div class="destination-card active">
+                <div class="destination-header">
+                    <span class="destination-icon">💾</span>
+                    <h4 class="destination-title">Local Disk</h4>
+                    <span class="destination-status active">Active</span>
+                </div>
+                <div class="destination-details">
+                    <strong>Path:</strong> <code>${config.local.path}</code>
+                </div>
+            </div>
+        `;
+
+        // SMB/CIFS Card
+        const smbClass = config.smb.status === 'active' ? 'active' : config.smb.status === 'not_mounted' ? 'warning' : 'disabled';
+        const smbStatusText = config.smb.status === 'active' ? 'Active' : config.smb.status === 'not_mounted' ? 'Not Mounted' : 'Disabled';
+        const smbStatusClass = config.smb.status === 'active' ? 'active' : config.smb.status === 'not_mounted' ? 'warning' : 'disabled';
+
+        html += `
+            <div class="destination-card ${smbClass}">
+                <div class="destination-header">
+                    <span class="destination-icon">🌐</span>
+                    <h4 class="destination-title">SMB/CIFS Share</h4>
+                    <span class="destination-status ${smbStatusClass}">${smbStatusText}</span>
+                </div>
+                <div class="destination-details">
+                    ${config.smb.enabled ? `
+                        <strong>Host:</strong> <code>${config.smb.host}</code><br>
+                        <strong>Share:</strong> <code>${config.smb.share}</code><br>
+                        <strong>Mount:</strong> <code>${config.smb.mount_point}</code>
+                        ${config.smb.status === 'not_mounted' ? '<br><em style="color: #856404;">⚠️ Enabled but not mounted</em>' : ''}
+                    ` : `
+                        <em style="color: #999;">Configure in .env file to enable</em>
+                    `}
+                </div>
+            </div>
+        `;
+
+        // NFS Card
+        const nfsClass = config.nfs.status === 'active' ? 'active' : config.nfs.status === 'not_mounted' ? 'warning' : 'disabled';
+        const nfsStatusText = config.nfs.status === 'active' ? 'Active' : config.nfs.status === 'not_mounted' ? 'Not Mounted' : 'Disabled';
+        const nfsStatusClass = config.nfs.status === 'active' ? 'active' : config.nfs.status === 'not_mounted' ? 'warning' : 'disabled';
+
+        html += `
+            <div class="destination-card ${nfsClass}">
+                <div class="destination-header">
+                    <span class="destination-icon">📁</span>
+                    <h4 class="destination-title">NFS Share</h4>
+                    <span class="destination-status ${nfsStatusClass}">${nfsStatusText}</span>
+                </div>
+                <div class="destination-details">
+                    ${config.nfs.enabled ? `
+                        <strong>Host:</strong> <code>${config.nfs.host}</code><br>
+                        <strong>Export:</strong> <code>${config.nfs.export}</code><br>
+                        <strong>Mount:</strong> <code>${config.nfs.mount_point}</code>
+                        ${config.nfs.status === 'not_mounted' ? '<br><em style="color: #856404;">⚠️ Enabled but not mounted</em>' : ''}
+                    ` : `
+                        <em style="color: #999;">Configure in .env file to enable</em>
+                    `}
+                </div>
+            </div>
+        `;
+
+        contentDiv.innerHTML = html;
+
+    } catch (error) {
+        console.error('Error loading backup configuration:', error);
+        const contentDiv = document.getElementById('backup-destinations-content');
+        contentDiv.innerHTML = '<div style="color: #dc3545;">Failed to load backup configuration</div>';
+    }
+}
+
 async function loadBackups() {
     try {
         const response = await fetch(`${API_BASE}/api/admin/backups`, {
