@@ -20,6 +20,7 @@ A full-stack web application for creating and managing interactive family trees 
 - **Theme System** - Light, Dark, and System Default modes with CSS variables
 - **Enhanced UI/UX** - Context menu, diagram toolbar, improved visual consistency
 - **Automated Release System** - GitHub Actions workflows for CI/CD
+- **Database Storage for Images** - Profile pictures stored securely in database instead of file system
 - **Comprehensive Documentation** - Complete USER_GUIDE.md with troubleshooting
 
 See [CHANGELOG.md](CHANGELOG.md) for complete version history.

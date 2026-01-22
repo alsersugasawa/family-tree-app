@@ -46,7 +46,9 @@ class FamilyMemberBase(BaseModel):
     country: Optional[str] = None
     occupation: Optional[str] = None
     bio: Optional[str] = None
-    photo_url: Optional[str] = None
+    photo_url: Optional[str] = None  # Deprecated - kept for backward compatibility
+    profile_picture_data: Optional[str] = None  # Base64-encoded image data
+    profile_picture_mime_type: Optional[str] = None  # MIME type (e.g., 'image/jpeg')
     social_media: Optional[Dict[str, Any]] = None
     previous_partners: Optional[str] = None
     father_id: Optional[int] = None
@@ -71,6 +73,8 @@ class FamilyMemberUpdate(BaseModel):
     occupation: Optional[str] = None
     bio: Optional[str] = None
     photo_url: Optional[str] = None
+    profile_picture_data: Optional[str] = None
+    profile_picture_mime_type: Optional[str] = None
     social_media: Optional[Dict[str, Any]] = None
     previous_partners: Optional[str] = None
     father_id: Optional[int] = None
@@ -102,6 +106,8 @@ class FamilyTreeNode(BaseModel):
     occupation: Optional[str] = None
     bio: Optional[str] = None
     photo_url: Optional[str] = None
+    profile_picture_data: Optional[str] = None
+    profile_picture_mime_type: Optional[str] = None
     social_media: Optional[Dict[str, Any]] = None
     previous_partners: Optional[str] = None
     father_id: Optional[int] = None

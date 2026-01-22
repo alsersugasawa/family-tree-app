@@ -43,7 +43,9 @@ class FamilyMember(Base):
     country = Column(String(100), nullable=True)
     occupation = Column(String(100))
     bio = Column(Text)
-    photo_url = Column(String(500))
+    photo_url = Column(String(500))  # Deprecated: kept for backward compatibility
+    profile_picture_data = Column(Text, nullable=True)  # Base64-encoded image data
+    profile_picture_mime_type = Column(String(50), nullable=True)  # e.g., 'image/jpeg', 'image/png'
     social_media = Column(JSON, nullable=True)  # Store as JSON: {facebook: url, instagram: url, etc}
     previous_partners = Column(Text, nullable=True)  # Comma-separated names or free text
 
