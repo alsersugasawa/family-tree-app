@@ -561,6 +561,11 @@ function renderFamilyTree() {
                 event.stopPropagation();
                 showMemberDetails(d.data.id);
             }
+        })
+        .on('contextmenu', (event, d) => {
+            event.preventDefault();
+            event.stopPropagation();
+            showContextMenu(event, d.data);
         });
 
     // Add profile pictures or default circles
@@ -2072,6 +2077,56 @@ function resetHighlighting() {
     // Reset partner links
     svg.selectAll('.partner-link')
         .style('opacity', 0.8);
+}
+
+// Context Menu Functionality
+let contextMenuMember = null;
+
+function showContextMenu(event, memberData) {
+    const contextMenu = document.getElementById('context-menu');
+    contextMenuMember = memberData;
+
+    // Position the context menu at cursor location
+    contextMenu.style.left = event.pageX + 'px';
+    contextMenu.style.top = event.pageY + 'px';
+    contextMenu.style.display = 'block';
+
+    // Close menu when clicking anywhere else
+    setTimeout(() => {
+        document.addEventListener('click', hideContextMenu);
+    }, 0);
+}
+
+function hideContextMenu() {
+    const contextMenu = document.getElementById('context-menu');
+    contextMenu.style.display = 'none';
+    document.removeEventListener('click', hideContextMenu);
+}
+
+function contextMenuHighlightDescendants() {
+    if (contextMenuMember) {
+        // Update the dropdown to show the selected person
+        const select = document.getElementById('highlight-person-select');
+        select.value = contextMenuMember.id;
+
+        // Trigger the highlight
+        highlightDescendants(contextMenuMember.id);
+    }
+    hideContextMenu();
+}
+
+function contextMenuViewDetails() {
+    if (contextMenuMember) {
+        showMemberDetails(contextMenuMember.id);
+    }
+    hideContextMenu();
+}
+
+function contextMenuEditMember() {
+    if (contextMenuMember) {
+        editMember(contextMenuMember.id);
+    }
+    hideContextMenu();
 }
 
 async function exportHighlightedPDF() {
