@@ -9,7 +9,8 @@ class BackupSettings(BaseSettings):
     """Backup configuration settings."""
 
     # Primary backup directory (local disk)
-    backup_dir: str = os.getenv("BACKUP_DIR", "/data/backups")
+    # Default to /app/backups which the container has write access to
+    backup_dir: str = os.getenv("BACKUP_DIR", "/app/backups")
 
     # SMB/CIFS file share settings
     smb_enabled: bool = os.getenv("SMB_BACKUP_ENABLED", "false").lower() == "true"

@@ -29,8 +29,8 @@ COPY ./app ./app
 COPY ./static ./static
 COPY ./migrations ./migrations
 
-# Create uploads directory
-RUN mkdir -p /app/uploads/profile_pictures
+# Create uploads and backups directories
+RUN mkdir -p /app/uploads/profile_pictures /app/backups
 
 # Create a non-root user
 RUN useradd -m -u 1000 appuser && \

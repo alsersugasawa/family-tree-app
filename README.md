@@ -427,19 +427,21 @@ On first run, you'll need to create an admin account:
 
 ### Local Disk Backups
 
-By default, backups are stored in `/data/backups` on the host machine. Configure this in `.env`:
+By default, backups are stored in `/app/backups` inside the container. Configure this in `.env`:
 
 ```bash
-BACKUP_DIR=/data/backups
+BACKUP_DIR=/app/backups
 BACKUP_RETENTION_DAYS=30
 ```
 
-Update the docker-compose.yml volume mount to your preferred location:
+To store backups on your host machine, add a volume mount in docker-compose.yml:
 
 ```yaml
 volumes:
-  - /your/backup/path:/data/backups
+  - /your/backup/path:/app/backups
 ```
+
+The backups directory is excluded from Git via `.gitignore`, so local backups won't be committed.
 
 ### SMB/CIFS File Share (Optional)
 
@@ -498,11 +500,13 @@ To enable automatic backup copying to an NFS share:
 ### How Backups Work
 
 1. When you create a backup via the admin portal:
-   - Primary backup is saved to `BACKUP_DIR` (default: `/data/backups`)
+   - Primary backup is saved to `BACKUP_DIR` (default: `/app/backups`)
    - If SMB is enabled and mounted, a copy is sent to the SMB share
    - If NFS is enabled and mounted, a copy is sent to the NFS share
 2. Backup status and file share destinations are logged in system logs
 3. All backups are tracked in the database with metadata
+
+**Note**: The `/app/backups` directory is created with proper permissions in the Docker container and is owned by the `appuser` non-root user for security.
 
 ## Security Notes
 
