@@ -438,20 +438,127 @@ async def get_backup_config(
         },
         "smb": {
             "enabled": backup_settings.smb_enabled,
-            "host": backup_settings.smb_host if backup_settings.smb_enabled else None,
-            "share": backup_settings.smb_share if backup_settings.smb_enabled else None,
-            "mount_point": backup_settings.smb_mount_point if backup_settings.smb_enabled else None,
+            "host": backup_settings.smb_host or "",
+            "share": backup_settings.smb_share or "",
+            "username": backup_settings.smb_username or "",
+            "mount_point": backup_settings.smb_mount_point or "/mnt/smb_backups",
             "status": "active" if (backup_settings.smb_enabled and os.path.ismount(backup_settings.smb_mount_point)) else "not_mounted" if backup_settings.smb_enabled else "disabled"
         },
         "nfs": {
             "enabled": backup_settings.nfs_enabled,
-            "host": backup_settings.nfs_host if backup_settings.nfs_enabled else None,
-            "export": backup_settings.nfs_export if backup_settings.nfs_enabled else None,
-            "mount_point": backup_settings.nfs_mount_point if backup_settings.nfs_enabled else None,
+            "host": backup_settings.nfs_host or "",
+            "export": backup_settings.nfs_export or "",
+            "mount_point": backup_settings.nfs_mount_point or "/mnt/nfs_backups",
             "status": "active" if (backup_settings.nfs_enabled and os.path.ismount(backup_settings.nfs_mount_point)) else "not_mounted" if backup_settings.nfs_enabled else "disabled"
         },
         "retention_days": backup_settings.backup_retention_days
     }
+
+
+@router.put("/backup-config")
+async def update_backup_config(
+    config: dict,
+    request: Request,
+    current_admin: User = Depends(get_current_admin_user),
+    db: AsyncSession = Depends(get_db)
+):
+    """Update backup configuration and write to .env file"""
+    try:
+        # Path to .env file
+        env_path = "/app/../.env"
+
+        # Read existing .env file or create from .env.example
+        if os.path.exists(env_path):
+            with open(env_path, 'r') as f:
+                env_lines = f.readlines()
+        elif os.path.exists("/app/../.env.example"):
+            with open("/app/../.env.example", 'r') as f:
+                env_lines = f.readlines()
+        else:
+            env_lines = []
+
+        # Parse existing env vars
+        env_vars = {}
+        for line in env_lines:
+            line = line.strip()
+            if line and not line.startswith('#') and '=' in line:
+                key, value = line.split('=', 1)
+                env_vars[key.strip()] = value.strip()
+
+        # Update SMB settings
+        if 'smb' in config:
+            env_vars['SMB_BACKUP_ENABLED'] = str(config['smb'].get('enabled', False)).lower()
+            if config['smb'].get('enabled'):
+                env_vars['SMB_HOST'] = config['smb'].get('host', '')
+                env_vars['SMB_SHARE'] = config['smb'].get('share', '')
+                env_vars['SMB_USERNAME'] = config['smb'].get('username', '')
+                if config['smb'].get('password'):
+                    env_vars['SMB_PASSWORD'] = config['smb']['password']
+                env_vars['SMB_MOUNT_POINT'] = config['smb'].get('mount_point', '/mnt/smb_backups')
+
+        # Update NFS settings
+        if 'nfs' in config:
+            env_vars['NFS_BACKUP_ENABLED'] = str(config['nfs'].get('enabled', False)).lower()
+            if config['nfs'].get('enabled'):
+                env_vars['NFS_HOST'] = config['nfs'].get('host', '')
+                env_vars['NFS_EXPORT'] = config['nfs'].get('export', '')
+                env_vars['NFS_MOUNT_POINT'] = config['nfs'].get('mount_point', '/mnt/nfs_backups')
+
+        # Update retention days
+        if 'retention_days' in config:
+            env_vars['BACKUP_RETENTION_DAYS'] = str(config['retention_days'])
+
+        # Ensure required vars exist
+        if 'DATABASE_URL' not in env_vars:
+            env_vars['DATABASE_URL'] = 'postgresql+asyncpg://postgres:postgres@db:5432/familytree'
+        if 'BACKUP_DIR' not in env_vars:
+            env_vars['BACKUP_DIR'] = '/app/backups'
+        if 'SECRET_KEY' not in env_vars:
+            env_vars['SECRET_KEY'] = 'your-secret-key-change-this-in-production'
+
+        # Write updated .env file
+        with open(env_path, 'w') as f:
+            f.write("# Database Configuration\n")
+            f.write(f"DATABASE_URL={env_vars.get('DATABASE_URL', 'postgresql+asyncpg://postgres:postgres@db:5432/familytree')}\n")
+            f.write("\n# Backup Configuration\n")
+            f.write(f"BACKUP_DIR={env_vars.get('BACKUP_DIR', '/app/backups')}\n")
+            f.write(f"BACKUP_RETENTION_DAYS={env_vars.get('BACKUP_RETENTION_DAYS', '30')}\n")
+            f.write("\n# SMB/CIFS File Share Configuration\n")
+            f.write(f"SMB_BACKUP_ENABLED={env_vars.get('SMB_BACKUP_ENABLED', 'false')}\n")
+            f.write(f"SMB_HOST={env_vars.get('SMB_HOST', 'your-smb-server.local')}\n")
+            f.write(f"SMB_SHARE={env_vars.get('SMB_SHARE', 'backups')}\n")
+            f.write(f"SMB_USERNAME={env_vars.get('SMB_USERNAME', 'backup_user')}\n")
+            f.write(f"SMB_PASSWORD={env_vars.get('SMB_PASSWORD', 'your_secure_password')}\n")
+            f.write(f"SMB_MOUNT_POINT={env_vars.get('SMB_MOUNT_POINT', '/mnt/smb_backups')}\n")
+            f.write("\n# NFS File Share Configuration\n")
+            f.write(f"NFS_BACKUP_ENABLED={env_vars.get('NFS_BACKUP_ENABLED', 'false')}\n")
+            f.write(f"NFS_HOST={env_vars.get('NFS_HOST', 'your-nfs-server.local')}\n")
+            f.write(f"NFS_EXPORT={env_vars.get('NFS_EXPORT', '/exports/backups')}\n")
+            f.write(f"NFS_MOUNT_POINT={env_vars.get('NFS_MOUNT_POINT', '/mnt/nfs_backups')}\n")
+            f.write("\n# Security\n")
+            f.write(f"SECRET_KEY={env_vars.get('SECRET_KEY', 'your-secret-key-change-this-in-production')}\n")
+
+        # Log the configuration change
+        await log_action(
+            db, "WARNING", "Backup configuration updated",
+            user_id=current_admin.id, action="backup_config_updated",
+            details={
+                "smb_enabled": config.get('smb', {}).get('enabled', False),
+                "nfs_enabled": config.get('nfs', {}).get('enabled', False)
+            },
+            ip_address=request.client.host if request else None
+        )
+
+        return {
+            "message": "Backup configuration updated successfully. Container restart required for changes to take effect.",
+            "restart_required": True
+        }
+
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to update backup configuration: {str(e)}"
+        )
 
 
 def copy_to_file_shares(filepath: str, filename: str) -> List[str]:

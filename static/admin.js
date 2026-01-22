@@ -859,3 +859,158 @@ async function checkFileStorageStatus() {
         updateServiceStatus('service-uploads', false);
     }
 }
+
+// Backup Settings Modal Functions
+function openBackupSettingsModal() {
+    // Load current settings first
+    loadCurrentBackupSettings();
+    document.getElementById('backup-settings-modal').style.display = 'flex';
+}
+
+function closeBackupSettingsModal() {
+    document.getElementById('backup-settings-modal').style.display = 'none';
+}
+
+async function loadCurrentBackupSettings() {
+    try {
+        const response = await fetch(`${API_BASE}/api/admin/backup-config`, {
+            headers: {
+                'Authorization': `Bearer ${adminToken}`
+            }
+        });
+
+        if (!response.ok) throw new Error('Failed to load backup settings');
+
+        const config = await response.json();
+
+        // Set SMB settings
+        document.getElementById('smb-enabled').checked = config.smb.enabled;
+        document.getElementById('smb-host').value = config.smb.host || '';
+        document.getElementById('smb-share').value = config.smb.share || '';
+        document.getElementById('smb-username').value = config.smb.username || '';
+        document.getElementById('smb-mount-point').value = config.smb.mount_point || '/mnt/smb_backups';
+        document.getElementById('smb-password').value = ''; // Never show existing password
+
+        // Set NFS settings
+        document.getElementById('nfs-enabled').checked = config.nfs.enabled;
+        document.getElementById('nfs-host').value = config.nfs.host || '';
+        document.getElementById('nfs-export').value = config.nfs.export || '';
+        document.getElementById('nfs-mount-point').value = config.nfs.mount_point || '/mnt/nfs_backups';
+
+        // Show/hide settings based on enabled state
+        toggleSMBSettings();
+        toggleNFSSettings();
+
+    } catch (error) {
+        console.error('Error loading backup settings:', error);
+        alert('Failed to load current backup settings');
+    }
+}
+
+// Toggle SMB settings visibility
+document.addEventListener('DOMContentLoaded', () => {
+    const smbToggle = document.getElementById('smb-enabled');
+    const nfsToggle = document.getElementById('nfs-enabled');
+
+    if (smbToggle) {
+        smbToggle.addEventListener('change', toggleSMBSettings);
+    }
+    if (nfsToggle) {
+        nfsToggle.addEventListener('change', toggleNFSSettings);
+    }
+});
+
+function toggleSMBSettings() {
+    const enabled = document.getElementById('smb-enabled').checked;
+    const settingsDiv = document.getElementById('smb-settings');
+    settingsDiv.style.display = enabled ? 'block' : 'none';
+}
+
+function toggleNFSSettings() {
+    const enabled = document.getElementById('nfs-enabled').checked;
+    const settingsDiv = document.getElementById('nfs-settings');
+    settingsDiv.style.display = enabled ? 'block' : 'none';
+}
+
+async function saveBackupSettings() {
+    try {
+        const smbEnabled = document.getElementById('smb-enabled').checked;
+        const nfsEnabled = document.getElementById('nfs-enabled').checked;
+
+        // Validate SMB settings if enabled
+        if (smbEnabled) {
+            const smbHost = document.getElementById('smb-host').value.trim();
+            const smbShare = document.getElementById('smb-share').value.trim();
+            const smbUsername = document.getElementById('smb-username').value.trim();
+
+            if (!smbHost || !smbShare || !smbUsername) {
+                alert('Please fill in all required SMB fields (Host, Share, Username)');
+                return;
+            }
+        }
+
+        // Validate NFS settings if enabled
+        if (nfsEnabled) {
+            const nfsHost = document.getElementById('nfs-host').value.trim();
+            const nfsExport = document.getElementById('nfs-export').value.trim();
+
+            if (!nfsHost || !nfsExport) {
+                alert('Please fill in all required NFS fields (Host, Export Path)');
+                return;
+            }
+        }
+
+        // Build configuration object
+        const config = {
+            smb: {
+                enabled: smbEnabled,
+                host: document.getElementById('smb-host').value.trim(),
+                share: document.getElementById('smb-share').value.trim(),
+                username: document.getElementById('smb-username').value.trim(),
+                mount_point: document.getElementById('smb-mount-point').value.trim()
+            },
+            nfs: {
+                enabled: nfsEnabled,
+                host: document.getElementById('nfs-host').value.trim(),
+                export: document.getElementById('nfs-export').value.trim(),
+                mount_point: document.getElementById('nfs-mount-point').value.trim()
+            }
+        };
+
+        // Include password if provided
+        const smbPassword = document.getElementById('smb-password').value;
+        if (smbPassword) {
+            config.smb.password = smbPassword;
+        }
+
+        // Send update request
+        const response = await fetch(`${API_BASE}/api/admin/backup-config`, {
+            method: 'PUT',
+            headers: {
+                'Authorization': `Bearer ${adminToken}`,
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(config)
+        });
+
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.detail || 'Failed to update backup settings');
+        }
+
+        const result = await response.json();
+
+        // Close modal
+        closeBackupSettingsModal();
+
+        // Show success message with restart instructions
+        alert(`${result.message}\n\nTo apply the changes:\n1. Stop containers: docker-compose down\n2. Uncomment volume mounts in docker-compose.yml (if using SMB/NFS)\n3. Start containers: docker-compose up -d`);
+
+        // Reload backup configuration display
+        loadBackupConfig();
+
+    } catch (error) {
+        console.error('Error saving backup settings:', error);
+        alert(`Failed to save backup settings: ${error.message}`);
+    }
+}
