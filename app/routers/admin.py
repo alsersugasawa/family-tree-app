@@ -450,7 +450,7 @@ async def get_backup_config(
             "mount_point": backup_settings.nfs_mount_point if backup_settings.nfs_enabled else None,
             "status": "active" if (backup_settings.nfs_enabled and os.path.ismount(backup_settings.nfs_mount_point)) else "not_mounted" if backup_settings.nfs_enabled else "disabled"
         },
-        "retention_days": backup_settings.retention_days
+        "retention_days": backup_settings.backup_retention_days
     }
 
 
