@@ -166,6 +166,7 @@ async function loadFamilyTree() {
         console.log('Loaded family members:', familyMembers);
         console.log('Photo URLs:', familyMembers.map(m => ({ name: `${m.first_name} ${m.last_name}`, photo_url: m.photo_url })));
         updateFamilySummary();
+        populateToolbarDropdown();
         renderFamilyTree();
     } catch (error) {
         console.error('Error loading family tree:', error);
@@ -1957,9 +1958,25 @@ let highlightMode = false;
 let highlightedPerson = null;
 let highlightedDescendants = new Set();
 
+function populateToolbarDropdown() {
+    const toolbarSelect = document.getElementById('highlight-person-select-toolbar');
+    if (!toolbarSelect) return;
+
+    toolbarSelect.innerHTML = '<option value="">Highlight Descendants</option>';
+    familyMembers
+        .sort((a, b) => `${a.first_name} ${a.last_name}`.localeCompare(`${b.first_name} ${b.last_name}`))
+        .forEach(member => {
+            const option = document.createElement('option');
+            option.value = member.id;
+            option.textContent = `${member.first_name} ${member.last_name}`;
+            toolbarSelect.appendChild(option);
+        });
+}
+
 function toggleHighlightMode(enabled) {
     highlightMode = enabled;
     const personSelect = document.getElementById('highlight-person-select');
+    const toolbarSelect = document.getElementById('highlight-person-select-toolbar');
     const exportPdfBtn = document.getElementById('export-highlight-pdf');
     const exportJpegBtn = document.getElementById('export-highlight-jpeg');
 
@@ -1967,16 +1984,23 @@ function toggleHighlightMode(enabled) {
         // Enable controls
         personSelect.disabled = false;
 
-        // Populate person select with all family members
-        personSelect.innerHTML = '<option value="">Select person...</option>';
-        familyMembers
-            .sort((a, b) => `${a.first_name} ${a.last_name}`.localeCompare(`${b.first_name} ${b.last_name}`))
-            .forEach(member => {
-                const option = document.createElement('option');
-                option.value = member.id;
-                option.textContent = `${member.first_name} ${member.last_name}`;
-                personSelect.appendChild(option);
-            });
+        // Populate both person select dropdowns with all family members
+        const populateSelect = (select) => {
+            select.innerHTML = '<option value="">Select person...</option>';
+            familyMembers
+                .sort((a, b) => `${a.first_name} ${a.last_name}`.localeCompare(`${b.first_name} ${b.last_name}`))
+                .forEach(member => {
+                    const option = document.createElement('option');
+                    option.value = member.id;
+                    option.textContent = `${member.first_name} ${member.last_name}`;
+                    select.appendChild(option);
+                });
+        };
+
+        populateSelect(personSelect);
+        if (toolbarSelect) {
+            populateSelect(toolbarSelect);
+        }
     } else {
         // Disable controls and clear highlighting
         personSelect.disabled = true;
@@ -2023,6 +2047,18 @@ function highlightDescendants(personId) {
     // Enable export buttons
     document.getElementById('export-highlight-pdf').disabled = false;
     document.getElementById('export-highlight-jpeg').disabled = false;
+}
+
+function clearHighlight() {
+    // Reset both dropdowns
+    const toolbarSelect = document.getElementById('highlight-person-select-toolbar');
+    const sidebarSelect = document.getElementById('highlight-person-select');
+
+    if (toolbarSelect) toolbarSelect.value = '';
+    if (sidebarSelect) sidebarSelect.value = '';
+
+    // Clear highlighting
+    highlightDescendants('');
 }
 
 function applyHighlighting() {
