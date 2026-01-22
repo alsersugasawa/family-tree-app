@@ -507,12 +507,33 @@ To enable automatic backup copying to an NFS share:
 ### How Backups Work
 
 #### Creating Backups
-1. When you create a backup via the admin portal:
-   - Primary backup is saved to `BACKUP_DIR` (default: `/app/backups`)
-   - If SMB is enabled and mounted, a copy is sent to the SMB share
-   - If NFS is enabled and mounted, a copy is sent to the NFS share
-2. Backup status and file share destinations are logged in system logs
-3. All backups are tracked in the database with metadata
+The admin portal offers three types of backups:
+
+1. **Database Backup** (🗄️ database)
+   - PostgreSQL dump of all user data
+   - Includes: users, family trees, members, shares, logs
+   - File format: `.sql`
+   - Use for: Data recovery and migration
+
+2. **Configuration Backup** (⚙️ config)
+   - Application and Docker configuration
+   - Includes: backup settings, Docker Compose, Dockerfile, .env.example, app version
+   - File format: `.json`
+   - Use for: Restoring settings after reinstall
+   - **Note**: Passwords are automatically redacted for security
+
+3. **Full Backup** (📦 full)
+   - Both database and configuration
+   - Creates two files: database (.sql) + config (.json)
+   - Use for: Complete system backup and disaster recovery
+   - **Recommended** for regular backups
+
+When you create a backup:
+- Primary backup is saved to `BACKUP_DIR` (default: `/app/backups`)
+- If SMB is enabled and mounted, a copy is sent to the SMB share
+- If NFS is enabled and mounted, a copy is sent to the NFS share
+- Backup status and file share destinations are logged in system logs
+- All backups are tracked in the database with metadata
 
 #### Downloading Backups
 From the admin portal, you can download backups with optional encryption:

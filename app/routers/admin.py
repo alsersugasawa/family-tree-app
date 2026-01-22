@@ -8,6 +8,7 @@ import os
 import subprocess
 import psutil
 import shutil
+import json
 from pathlib import Path
 from cryptography.fernet import Fernet
 from cryptography.hazmat.primitives import hashes
@@ -519,6 +520,65 @@ def decrypt_file(encrypted_filepath: str, password: str) -> str:
     return decrypted_filepath
 
 
+def create_config_backup(filepath: str) -> dict:
+    """Create a backup of application configuration."""
+    config_data = {
+        "version": APP_VERSION,
+        "backup_timestamp": datetime.utcnow().isoformat(),
+        "backup_settings": {
+            "backup_dir": backup_settings.backup_dir,
+            "backup_retention_days": backup_settings.backup_retention_days,
+            "smb_enabled": backup_settings.smb_enabled,
+            "smb_host": backup_settings.smb_host if backup_settings.smb_enabled else None,
+            "smb_share": backup_settings.smb_share if backup_settings.smb_enabled else None,
+            "smb_mount_point": backup_settings.smb_mount_point if backup_settings.smb_enabled else None,
+            "nfs_enabled": backup_settings.nfs_enabled,
+            "nfs_host": backup_settings.nfs_host if backup_settings.nfs_enabled else None,
+            "nfs_export": backup_settings.nfs_export if backup_settings.nfs_enabled else None,
+            "nfs_mount_point": backup_settings.nfs_mount_point if backup_settings.nfs_enabled else None,
+        },
+        "environment": {
+            "database_url": os.getenv("DATABASE_URL", "").replace(
+                os.getenv("PGPASSWORD", "postgres"), "***REDACTED***"
+            ) if os.getenv("DATABASE_URL") else None,
+        },
+        "docker_files": {}
+    }
+
+    # Read docker-compose.yml if it exists
+    docker_compose_path = "/app/../docker-compose.yml"
+    if os.path.exists(docker_compose_path):
+        try:
+            with open(docker_compose_path, 'r') as f:
+                config_data["docker_files"]["docker-compose.yml"] = f.read()
+        except Exception:
+            pass
+
+    # Read Dockerfile if it exists
+    dockerfile_path = "/app/../Dockerfile"
+    if os.path.exists(dockerfile_path):
+        try:
+            with open(dockerfile_path, 'r') as f:
+                config_data["docker_files"]["Dockerfile"] = f.read()
+        except Exception:
+            pass
+
+    # Read .env.example if it exists (don't read actual .env for security)
+    env_example_path = "/app/../.env.example"
+    if os.path.exists(env_example_path):
+        try:
+            with open(env_example_path, 'r') as f:
+                config_data["docker_files"][".env.example"] = f.read()
+        except Exception:
+            pass
+
+    # Write configuration backup as JSON
+    with open(filepath, 'w') as f:
+        json.dump(config_data, f, indent=2)
+
+    return config_data
+
+
 @router.post("/backups", response_model=BackupResponse)
 async def create_backup(
     backup_data: BackupCreate,
@@ -528,9 +588,14 @@ async def create_backup(
 ):
     """Create a new backup to local disk and configured file shares"""
     timestamp = datetime.utcnow().strftime("%Y%m%d_%H%M%S")
-    filename = f"backup_{backup_data.backup_type}_{timestamp}.sql"
 
-    # Use configured backup directory (defaults to /data/backups)
+    # Determine file extension based on backup type
+    if backup_data.backup_type == "config":
+        filename = f"backup_config_{timestamp}.json"
+    else:
+        filename = f"backup_{backup_data.backup_type}_{timestamp}.sql"
+
+    # Use configured backup directory
     backup_dir = backup_settings.backup_dir
     os.makedirs(backup_dir, exist_ok=True)
     filepath = os.path.join(backup_dir, filename)
@@ -549,10 +614,38 @@ async def create_backup(
                 check=True,
                 env={**os.environ, "PGPASSWORD": "postgres"}
             )
+        elif backup_data.backup_type == "config":
+            # Configuration backup
+            create_config_backup(filepath)
+        elif backup_data.backup_type == "full":
+            # Full backup: both database and config
+            # Create database backup
+            db_filename = f"backup_database_{timestamp}.sql"
+            db_filepath = os.path.join(backup_dir, db_filename)
+            subprocess.run(
+                [
+                    "pg_dump",
+                    "-h", "db",
+                    "-U", "postgres",
+                    "-d", "familytree",
+                    "-f", db_filepath
+                ],
+                check=True,
+                env={**os.environ, "PGPASSWORD": "postgres"}
+            )
+
+            # Create config backup
+            config_filename = f"backup_config_{timestamp}.json"
+            config_filepath = os.path.join(backup_dir, config_filename)
+            create_config_backup(config_filepath)
+
+            # Use database file as primary filepath for now
+            filepath = db_filepath
+            filename = db_filename
         else:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Invalid backup type"
+                detail="Invalid backup type. Must be 'database', 'config', or 'full'"
             )
 
         # Get file size

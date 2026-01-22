@@ -359,6 +359,42 @@
         </div>
     </div>
 
+    <!-- Create Backup Modal -->
+    <div id="create-backup-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Create New Backup</h3>
+                <button onclick="closeCreateBackupModal()" class="btn-close">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label>Backup Type *</label>
+                    <select id="backup-type-select" class="form-control">
+                        <option value="database">Database Only - PostgreSQL dump (.sql)</option>
+                        <option value="config">Configuration Only - App settings & Docker config (.json)</option>
+                        <option value="full">Full Backup - Database + Configuration</option>
+                    </select>
+                    <small style="display: block; margin-top: 5px; color: #666;">
+                        Database backups contain all user data. Configuration backups include app settings, backup config, and Docker files.
+                    </small>
+                </div>
+                <div id="backup-type-info" style="margin-top: 15px; padding: 10px; background: #f8f9fa; border-radius: 6px; font-size: 14px;">
+                    <strong>Database Backup includes:</strong>
+                    <ul style="margin: 5px 0 0 20px;">
+                        <li>All users and authentication data</li>
+                        <li>Family trees and members</li>
+                        <li>Tree shares and permissions</li>
+                        <li>System logs and backups metadata</li>
+                    </ul>
+                </div>
+            </div>
+            <div class="form-actions">
+                <button type="button" onclick="closeCreateBackupModal()" class="btn-secondary">Cancel</button>
+                <button type="button" onclick="confirmCreateBackup()" class="btn-primary">Create Backup</button>
+            </div>
+        </div>
+    </div>
+
     <!-- Download Backup Modal -->
     <div id="download-backup-modal" class="modal">
         <div class="modal-content">

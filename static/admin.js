@@ -393,8 +393,27 @@ async function loadBackups() {
         }
 
         tbody.innerHTML = backups.map(backup => {
-            const typeClass = backup.backup_type === 'snapshot' ? 'badge-warning' : 'badge-info';
-            const typeIcon = backup.backup_type === 'snapshot' ? '📸 ' : '';
+            let typeClass = 'badge-info';
+            let typeIcon = '';
+
+            switch(backup.backup_type) {
+                case 'snapshot':
+                    typeClass = 'badge-warning';
+                    typeIcon = '📸 ';
+                    break;
+                case 'config':
+                    typeClass = 'badge-secondary';
+                    typeIcon = '⚙️ ';
+                    break;
+                case 'full':
+                    typeClass = 'badge-success';
+                    typeIcon = '📦 ';
+                    break;
+                default:
+                    typeClass = 'badge-info';
+                    typeIcon = '🗄️ ';
+            }
+
             return `
             <tr>
                 <td>${backup.filename}</td>
@@ -417,8 +436,65 @@ async function loadBackups() {
     }
 }
 
-async function createBackup() {
-    if (!confirm('Create a new database backup? This may take a few moments.')) {
+// Create Backup Modal Functions
+function createBackup() {
+    document.getElementById('backup-type-select').value = 'database';
+    updateBackupTypeInfo();
+    document.getElementById('create-backup-modal').style.display = 'flex';
+}
+
+function closeCreateBackupModal() {
+    document.getElementById('create-backup-modal').style.display = 'none';
+}
+
+function updateBackupTypeInfo() {
+    const backupType = document.getElementById('backup-type-select').value;
+    const infoDiv = document.getElementById('backup-type-info');
+
+    const infoContent = {
+        'database': `
+            <strong>Database Backup includes:</strong>
+            <ul style="margin: 5px 0 0 20px;">
+                <li>All users and authentication data</li>
+                <li>Family trees and members</li>
+                <li>Tree shares and permissions</li>
+                <li>System logs and backups metadata</li>
+            </ul>
+        `,
+        'config': `
+            <strong>Configuration Backup includes:</strong>
+            <ul style="margin: 5px 0 0 20px;">
+                <li>Backup settings (local, SMB, NFS)</li>
+                <li>Docker Compose configuration</li>
+                <li>Dockerfile configuration</li>
+                <li>Environment template (.env.example)</li>
+                <li>App version and metadata</li>
+            </ul>
+            <em style="color: #856404;">Note: Passwords are redacted for security</em>
+        `,
+        'full': `
+            <strong>Full Backup includes:</strong>
+            <ul style="margin: 5px 0 0 20px;">
+                <li><strong>Database:</strong> All user data, trees, and system logs</li>
+                <li><strong>Configuration:</strong> App settings and Docker config</li>
+            </ul>
+            <em style="color: #28a745;">Recommended for complete system backup</em>
+        `
+    };
+
+    infoDiv.innerHTML = infoContent[backupType] || '';
+}
+
+async function confirmCreateBackup() {
+    const backupType = document.getElementById('backup-type-select').value;
+
+    const typeLabels = {
+        'database': 'database',
+        'config': 'configuration',
+        'full': 'full (database + configuration)'
+    };
+
+    if (!confirm(`Create a new ${typeLabels[backupType]} backup? This may take a few moments.`)) {
         return;
     }
 
@@ -429,7 +505,7 @@ async function createBackup() {
                 'Authorization': `Bearer ${adminToken}`,
                 'Content-Type': 'application/json'
             },
-            body: JSON.stringify({ backup_type: 'database' })
+            body: JSON.stringify({ backup_type: backupType })
         });
 
         if (!response.ok) {
@@ -437,13 +513,22 @@ async function createBackup() {
             throw new Error(error.detail || 'Failed to create backup');
         }
 
-        alert('Backup created successfully');
+        alert(`${typeLabels[backupType].charAt(0).toUpperCase() + typeLabels[backupType].slice(1)} backup created successfully`);
+        closeCreateBackupModal();
         loadBackups();
 
     } catch (error) {
         alert(error.message);
     }
 }
+
+// Add event listener for backup type change
+document.addEventListener('DOMContentLoaded', function() {
+    const backupTypeSelect = document.getElementById('backup-type-select');
+    if (backupTypeSelect) {
+        backupTypeSelect.addEventListener('change', updateBackupTypeInfo);
+    }
+});
 
 // Backup Download Modal Functions
 let currentDownloadBackupId = null;
