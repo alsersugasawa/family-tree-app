@@ -42,10 +42,15 @@ Thumbs.db
 # Environment variables
 .env
 .env.local
+# Keep .env.test as a template but ignore if it has real credentials
 
 # Logs
 *.log
 
-# Backups
+# Backups (Development)
 backups/
 *.sql
+
+# Test Environment Data (Isolated)
+backups-test/
+postgres_data_test/
