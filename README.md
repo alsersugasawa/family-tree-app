@@ -180,6 +180,8 @@ For detailed usage instructions, admin portal setup, and troubleshooting, see [U
 
 - **[USER_GUIDE.md](USER_GUIDE.md)** - Complete user documentation with detailed instructions
 - **[CHANGELOG.md](CHANGELOG.md)** - Version history and release notes
+- **[TEST_ENVIRONMENT.md](TEST_ENVIRONMENT.md)** - Separate test environment setup (isolated from dev data)
+- **[k8s/README.md](k8s/README.md)** - Kubernetes deployment guide
 
 ## License
 
