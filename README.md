@@ -176,11 +176,32 @@ For detailed usage instructions, admin portal setup, and troubleshooting, see [U
 - Mobile app (iOS/Android)
 - Print-optimized layouts
 
+## Test Environment
+
+A completely isolated test instance is available in a separate directory:
+
+```bash
+# Located at: /Users/alsersugasawa/my-web-app-test
+cd ../my-web-app-test
+
+# Start test instance (port 8081, database port 5433)
+docker-compose up -d
+
+# Access at http://localhost:8081
+```
+
+Benefits:
+- **Complete Isolation** - Separate directory, no mixing with dev code
+- **Different Ports** - Run both dev and test simultaneously
+- **Easy Cleanup** - Delete entire test directory if needed
+- **Safe Testing** - No risk to development data
+
+See [../my-web-app-test/README.md](../my-web-app-test/README.md) for details.
+
 ## Documentation
 
 - **[USER_GUIDE.md](USER_GUIDE.md)** - Complete user documentation with detailed instructions
 - **[CHANGELOG.md](CHANGELOG.md)** - Version history and release notes
-- **[TEST_ENVIRONMENT.md](TEST_ENVIRONMENT.md)** - Separate test environment setup (isolated from dev data)
 - **[k8s/README.md](k8s/README.md)** - Kubernetes deployment guide
 
 ## License
