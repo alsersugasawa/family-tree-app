@@ -1,0 +1,10 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: app-config
+  namespace: family-tree
+  labels:
+    app: family-tree-web
+data:
+  DATABASE_URL: "postgresql+asyncpg://postgres:postgres@postgres:5432/familytree"
+  # Add other non-sensitive configuration here

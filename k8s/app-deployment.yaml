@@ -1,0 +1,91 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: family-tree-web
+  namespace: family-tree
+  labels:
+    app: family-tree-web
+spec:
+  replicas: 2  # Scale horizontally for high availability
+  selector:
+    matchLabels:
+      app: family-tree-web
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  template:
+    metadata:
+      labels:
+        app: family-tree-web
+    spec:
+      containers:
+      - name: web
+        image: alsersugasawa/family-tree-app:v4.0.1
+        # In production, use specific version tags
+        ports:
+        - containerPort: 8000
+          name: http
+        env:
+        - name: DATABASE_URL
+          valueFrom:
+            configMapKeyRef:
+              name: app-config
+              key: DATABASE_URL
+        volumeMounts:
+        - name: backups
+          mountPath: /app/backups
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "250m"
+          limits:
+            memory: "512Mi"
+            cpu: "500m"
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8000
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: 8000
+          initialDelaySeconds: 10
+          periodSeconds: 5
+          timeoutSeconds: 3
+          failureThreshold: 3
+      volumes:
+      - name: backups
+        persistentVolumeClaim:
+          claimName: app-backups-pvc
+      # Optional: Add init container to run migrations
+      initContainers:
+      - name: run-migrations
+        image: alsersugasawa/family-tree-app:v4.0.1
+        command: ['sh', '-c']
+        args:
+        - |
+          echo "Running database migrations..."
+          for f in /app/migrations/*.sql; do
+            if [ -f "$f" ]; then
+              echo "Applying migration: $f"
+              PGPASSWORD=$POSTGRES_PASSWORD psql -h postgres -U postgres -d familytree -f "$f" || echo "Migration $f failed or already applied"
+            fi
+          done
+          echo "Migrations complete"
+        env:
+        - name: DATABASE_URL
+          valueFrom:
+            configMapKeyRef:
+              name: app-config
+              key: DATABASE_URL
+        - name: POSTGRES_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: postgres-secrets
+              key: POSTGRES_PASSWORD

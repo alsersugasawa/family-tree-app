@@ -4,6 +4,7 @@ from sqlalchemy import select
 from typing import List
 import os
 import uuid
+import base64
 from pathlib import Path
 from app.database import get_db
 from app.models import User, FamilyMember
@@ -158,6 +159,11 @@ async def get_family_tree(
                 member_children[member.mother_id].append(member.id)
 
     for member in members:
+        # Convert base64 profile picture to data URL for frontend
+        photo_url = member.photo_url  # Fallback to old field
+        if member.profile_picture_data and member.profile_picture_mime_type:
+            photo_url = f"data:{member.profile_picture_mime_type};base64,{member.profile_picture_data}"
+
         tree_node = FamilyTreeNode(
             id=member.id,
             first_name=member.first_name,
@@ -168,7 +174,9 @@ async def get_family_tree(
             birth_place=member.birth_place,
             occupation=member.occupation,
             bio=member.bio,
-            photo_url=member.photo_url,
+            photo_url=photo_url,
+            profile_picture_data=member.profile_picture_data,
+            profile_picture_mime_type=member.profile_picture_mime_type,
             father_id=member.father_id,
             mother_id=member.mother_id,
             children=member_children.get(member.id, [])
@@ -215,37 +223,24 @@ async def upload_member_photo(
     if file_size > 5 * 1024 * 1024:  # 5MB
         raise HTTPException(status_code=400, detail="File size exceeds 5MB limit")
 
-    # Reset file position
-    await file.seek(0)
+    # Convert image to base64 for database storage
+    base64_data = base64.b64encode(content).decode('utf-8')
 
-    # Create uploads directory if it doesn't exist
-    upload_dir = Path("uploads/profile_pictures")
-    upload_dir.mkdir(parents=True, exist_ok=True)
+    # Store in database instead of file system
+    member.profile_picture_data = base64_data
+    member.profile_picture_mime_type = file.content_type
 
-    # Generate unique filename
-    file_extension = file.filename.split(".")[-1] if "." in file.filename else "jpg"
-    unique_filename = f"{uuid.uuid4()}.{file_extension}"
-    file_path = upload_dir / unique_filename
+    # Clear deprecated photo_url field
+    member.photo_url = None
 
-    # Save file
-    with open(file_path, "wb") as f:
-        f.write(content)
-
-    # Delete old photo if exists
-    if member.photo_url:
-        old_file_path = Path(member.photo_url)
-        if old_file_path.exists():
-            try:
-                old_file_path.unlink()
-            except Exception:
-                pass  # Ignore errors when deleting old file
-
-    # Update member's photo_url
-    member.photo_url = f"/uploads/profile_pictures/{unique_filename}"
     await db.commit()
     await db.refresh(member)
 
+    # Return data URL format for immediate use by frontend
+    data_url = f"data:{file.content_type};base64,{base64_data}"
+
     return {
         "message": "Photo uploaded successfully",
-        "photo_url": member.photo_url
+        "profile_picture_data": data_url,
+        "mime_type": file.content_type
     }
