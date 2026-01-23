@@ -80,7 +80,7 @@ app.include_router(admin.router)
 
 # Mount static files
 app.mount("/static", StaticFiles(directory="static"), name="static")
-app.mount("/uploads", StaticFiles(directory="uploads"), name="uploads")
+# Note: /uploads removed - profile pictures now stored in database
 
 
 @app.get("/")
