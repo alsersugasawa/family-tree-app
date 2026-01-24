@@ -5,6 +5,103 @@ All notable changes to the Family Tree App will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.0.2] - 2026-01-24
+
+### Added
+- **Customizable Application Name**
+  - New `app_config` table for storing application-wide settings
+  - `app_name` configuration stored in database (default: "Family Tree")
+  - Initial setup wizard includes app name field with real-time validation
+  - Public API endpoint `/api/admin/config` for retrieving app configuration
+  - Dynamic app name displayed throughout the application (login page, titles, headers)
+  - Organizations can brand the application with custom names (e.g., "Smith Family Heritage")
+
+- **Initial Setup Wizard**
+  - Beautiful 3-step setup wizard for first-run installations
+  - Step 1: Welcome screen with introduction
+  - Step 2: Admin account creation with app name, username, email, password fields
+  - Step 3: Success confirmation with access instructions
+  - Real-time password strength validation
+  - Form validation with error messages for all fields
+  - Modern UI with progress indicators and smooth transitions
+  - Automatic redirect from login page when no admin exists
+  - First-run detection via `/api/admin/first-run` endpoint
+
+- **Multi-Version Update System**
+  - New `/api/admin/releases` endpoint fetching all GitHub releases
+  - Releases table in admin portal showing version, date, and status
+  - "Update" buttons for newer versions, "Rollback" buttons for older versions
+  - Current version highlighted in the releases table
+  - Semantic version comparison for proper sorting
+  - Ability to install any specific version from release history
+
+- **Docker-Aware Update Mechanism**
+  - Complete rewrite of update system for Docker deployments
+  - Generates update scripts that run from Docker host
+  - Two modes: Manual (default, safer) and Automatic (requires Docker socket)
+  - Script pulls new Docker images from Docker Hub
+  - Updates `docker-compose.yml` with new image reference
+  - Restarts containers with new version
+  - Runs SQL migrations via `docker exec`
+  - Database persists across updates (volume not affected)
+  - Supports both updates and rollbacks to any version
+
+- **Enhanced Admin Portal**
+  - Replaced single update button with comprehensive releases table
+  - Shows all available versions with release dates
+  - Status indicators (Current, Newer, Older)
+  - Individual update/rollback actions per version
+  - Improved error handling with detailed messages
+  - Token-based authentication with 30-minute expiration
+  - Session expiration handling with user-friendly messages
+
+### Fixed
+- **Family Members Not Appearing in Diagram**
+  - Added missing `tree_id` field to `FamilyMemberBase` schema
+  - Added `tree_id` field to `FamilyMemberUpdate` schema
+  - Backend now properly accepts and stores `tree_id` from frontend
+  - Family members correctly associated with trees
+  - Diagram queries now return all members for the selected tree
+  - Database migration to update existing members with `tree_id`
+
+- **Admin Login Issues**
+  - Fixed token key mismatch (consistent use of `adminToken` variable)
+  - Added proper JWT token expiration handling
+  - Fixed race condition in update check initialization
+  - Added `DOMContentLoaded` event listener with delay for token availability
+  - Dynamic app name loading on login page
+
+- **Update System Errors**
+  - Added `requests==2.31.0` library to requirements.txt
+  - Fixed GitHub API URL (removed placeholder)
+  - Improved error messages for update failures
+  - Added proper 401 handling for expired tokens
+
+### Changed
+- **Update Process**
+  - Removed git and alembic dependencies from update mechanism
+  - Uses Docker image pulls instead of git operations
+  - SQL migrations instead of alembic for database updates
+  - Manual script execution preferred over automatic updates
+  - Better separation between development and production workflows
+
+- **Static Files**
+  - Created `setup.html` for initial setup wizard
+  - Modified `admin-login.html` to include first-run detection and app name loading
+  - Updated `admin.js` with new releases management functions
+  - Removed obsolete update functions from admin portal
+
+- **Database Schema**
+  - Migration `009_add_app_config.sql` creates `app_config` table
+  - Default app name "Family Tree" inserted during migration
+  - Index on `app_config.key` for fast lookups
+
+### Deployment
+- Updated Kubernetes deployment manifests to v4.0.2
+- Updated Docker Compose image reference to v4.0.2
+- All dependencies verified and included in requirements.txt
+- Container builds successfully with all required packages
+
 ## [4.0.1] - 2026-01-22
 
 ### Added

@@ -22,7 +22,7 @@ spec:
     spec:
       containers:
       - name: web
-        image: alsersugasawa/family-tree-app:v4.0.1
+        image: alsersugasawa/family-tree-app:v4.0.2
         # In production, use specific version tags
         ports:
         - containerPort: 8000
@@ -66,7 +66,7 @@ spec:
       # Optional: Add init container to run migrations
       initContainers:
       - name: run-migrations
-        image: alsersugasawa/family-tree-app:v4.0.1
+        image: alsersugasawa/family-tree-app:v4.0.2
         command: ['sh', '-c']
         args:
         - |

@@ -145,3 +145,13 @@ class TreeShare(Base):
     tree = relationship("FamilyTree", back_populates="shares")
     shared_by_user = relationship("User", foreign_keys=[shared_by_user_id])
     shared_with_user = relationship("User", foreign_keys=[shared_with_user_id], back_populates="shared_trees")
+
+
+class AppConfig(Base):
+    __tablename__ = "app_config"
+
+    id = Column(Integer, primary_key=True, index=True)
+    key = Column(String(100), unique=True, nullable=False, index=True)
+    value = Column(Text, nullable=False)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)

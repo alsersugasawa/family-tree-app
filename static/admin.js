@@ -1016,107 +1016,221 @@ async function saveBackupSettings() {
 }
 
 // Application Update Functions
-async function checkForUpdates() {
+async function loadAllReleases() {
     try {
         const checkBtn = document.getElementById('check-update-btn');
         const statusText = document.getElementById('update-status-text');
 
         checkBtn.disabled = true;
-        checkBtn.innerHTML = '<i class="bi bi-hourglass-split"></i> Checking...';
-        statusText.textContent = 'Checking for updates...';
+        checkBtn.innerHTML = '<i class="bi bi-hourglass-split"></i> Loading...';
+        statusText.textContent = 'Loading releases...';
 
-        const response = await fetch('/api/admin/version', {
+        const response = await fetch('/api/admin/releases', {
             headers: {
-                'Authorization': `Bearer ${localStorage.getItem('adminToken')}`
+                'Authorization': `Bearer ${adminToken}`
             }
         });
 
         if (!response.ok) {
-            throw new Error('Failed to check for updates');
+            if (response.status === 401) {
+                throw new Error('Session expired. Please refresh the page and log in again.');
+            }
+            const errorText = await response.text();
+            throw new Error(`Failed to load releases: ${response.status} ${errorText}`);
         }
 
-        const versionInfo = await response.json();
+        const data = await response.json();
 
-        // Update version display
-        document.getElementById('current-version').textContent = versionInfo.current_version;
-        document.getElementById('latest-version').textContent = versionInfo.latest_version || 'N/A';
+        // Update current version display
+        document.getElementById('current-version').textContent = data.current_version;
 
-        const updateBanner = document.getElementById('update-available-banner');
-        const installBtn = document.getElementById('install-update-btn');
+        // Find latest non-prerelease version
+        const latestRelease = data.releases.find(r => !r.prerelease);
+        if (latestRelease) {
+            document.getElementById('latest-version').textContent = latestRelease.version;
 
-        if (versionInfo.update_available) {
-            updateBanner.style.display = 'block';
-            installBtn.disabled = false;
-            statusText.innerHTML = '<span style="color: #ff9800;">Update Available</span>';
+            const updateBanner = document.getElementById('update-available-banner');
+            if (latestRelease.version !== data.current_version) {
+                updateBanner.style.display = 'block';
+                statusText.innerHTML = '<span style="color: #ff9800;">Updates Available</span>';
+            } else {
+                updateBanner.style.display = 'none';
+                statusText.innerHTML = '<span style="color: #4caf50;">Up to Date</span>';
+            }
         } else {
-            updateBanner.style.display = 'none';
-            installBtn.disabled = true;
-            statusText.innerHTML = '<span style="color: #4caf50;">Up to Date</span>';
+            document.getElementById('latest-version').textContent = 'N/A';
+            statusText.innerHTML = '<span style="color: #999;">No releases found</span>';
         }
+
+        // Populate releases table
+        populateReleasesTable(data.releases, data.current_version);
+
+        // Show releases container
+        document.getElementById('releases-container').style.display = 'block';
 
         checkBtn.disabled = false;
         checkBtn.innerHTML = '<i class="bi bi-arrow-clockwise"></i> Check for Updates';
 
     } catch (error) {
-        console.error('Error checking for updates:', error);
-        document.getElementById('update-status-text').innerHTML = '<span style="color: #f44336;">Check Failed</span>';
+        console.error('Error loading releases:', error);
+        document.getElementById('update-status-text').innerHTML = '<span style="color: #f44336;">Load Failed</span>';
 
         const checkBtn = document.getElementById('check-update-btn');
         checkBtn.disabled = false;
         checkBtn.innerHTML = '<i class="bi bi-arrow-clockwise"></i> Check for Updates';
 
-        alert(`Failed to check for updates: ${error.message}`);
+        alert(`Failed to load releases: ${error.message}`);
     }
 }
 
-async function installUpdate() {
-    if (!confirm('This will update the application to the latest version.\n\nA snapshot backup will be created automatically before the update.\n\nThe application will restart during this process.\n\nDo you want to proceed?')) {
+function populateReleasesTable(releases, currentVersion) {
+    const tbody = document.getElementById('releases-table-body');
+    tbody.innerHTML = '';
+
+    if (!releases || releases.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="4" style="padding: 20px; text-align: center; color: #999;">No releases found</td></tr>';
+        return;
+    }
+
+    releases.forEach(release => {
+        const row = document.createElement('tr');
+        row.style.borderBottom = '1px solid #eee';
+
+        // Version column
+        const versionCell = document.createElement('td');
+        versionCell.style.padding = '12px';
+        versionCell.innerHTML = `
+            <strong>${release.version}</strong>
+            ${release.prerelease ? '<span style="background: #ff9800; color: white; padding: 2px 6px; border-radius: 3px; font-size: 11px; margin-left: 6px;">PRE-RELEASE</span>' : ''}
+        `;
+        row.appendChild(versionCell);
+
+        // Release date column
+        const dateCell = document.createElement('td');
+        dateCell.style.padding = '12px';
+        const date = new Date(release.published_at);
+        dateCell.textContent = date.toLocaleDateString('en-US', {
+            year: 'numeric',
+            month: 'short',
+            day: 'numeric'
+        });
+        row.appendChild(dateCell);
+
+        // Status column
+        const statusCell = document.createElement('td');
+        statusCell.style.padding = '12px';
+        if (release.is_current) {
+            statusCell.innerHTML = '<span style="color: #4caf50; font-weight: bold;"><i class="bi bi-check-circle"></i> Current</span>';
+        } else if (compareVersions(release.version, currentVersion) > 0) {
+            statusCell.innerHTML = '<span style="color: #2196f3;"><i class="bi bi-arrow-up"></i> Newer</span>';
+        } else {
+            statusCell.innerHTML = '<span style="color: #999;"><i class="bi bi-arrow-down"></i> Older</span>';
+        }
+        row.appendChild(statusCell);
+
+        // Action column
+        const actionCell = document.createElement('td');
+        actionCell.style.padding = '12px';
+        actionCell.style.textAlign = 'center';
+
+        if (release.is_current) {
+            actionCell.innerHTML = '<span style="color: #999; font-size: 12px;">Installed</span>';
+        } else {
+            const actionBtn = document.createElement('button');
+            actionBtn.className = 'btn-primary';
+            actionBtn.style.padding = '6px 16px';
+            actionBtn.style.fontSize = '12px';
+
+            if (compareVersions(release.version, currentVersion) > 0) {
+                actionBtn.innerHTML = '<i class="bi bi-download"></i> Update';
+                actionBtn.onclick = () => installSpecificVersion(release.version, 'update');
+            } else {
+                actionBtn.innerHTML = '<i class="bi bi-arrow-counterclockwise"></i> Rollback';
+                actionBtn.className = 'btn-secondary';
+                actionBtn.onclick = () => installSpecificVersion(release.version, 'rollback');
+            }
+
+            actionCell.appendChild(actionBtn);
+        }
+        row.appendChild(actionCell);
+
+        tbody.appendChild(row);
+    });
+}
+
+function compareVersions(v1, v2) {
+    const parts1 = v1.split('.').map(Number);
+    const parts2 = v2.split('.').map(Number);
+
+    for (let i = 0; i < Math.max(parts1.length, parts2.length); i++) {
+        const part1 = parts1[i] || 0;
+        const part2 = parts2[i] || 0;
+
+        if (part1 > part2) return 1;
+        if (part1 < part2) return -1;
+    }
+
+    return 0;
+}
+
+async function installSpecificVersion(version, action) {
+    const actionText = action === 'update' ? 'update to' : 'rollback to';
+    const confirmMsg = `This will ${actionText} version ${version}.\n\nA snapshot backup will be created automatically before the ${action}.\n\nDo you want to proceed?`;
+
+    if (!confirm(confirmMsg)) {
         return;
     }
 
     try {
-        const installBtn = document.getElementById('install-update-btn');
-        const checkBtn = document.getElementById('check-update-btn');
         const progressDiv = document.getElementById('update-progress');
-        const statusText = document.getElementById('update-status-text');
+        const checkBtn = document.getElementById('check-update-btn');
 
-        // Disable buttons and show progress
-        installBtn.disabled = true;
-        checkBtn.disabled = true;
         progressDiv.style.display = 'block';
-        statusText.textContent = 'Installing update...';
+        if (checkBtn) checkBtn.disabled = true;
 
         const response = await fetch('/api/admin/update', {
             method: 'POST',
             headers: {
-                'Authorization': `Bearer ${localStorage.getItem('adminToken')}`,
+                'Authorization': `Bearer ${adminToken}`,
                 'Content-Type': 'application/json'
-            }
+            },
+            body: JSON.stringify({ version: version })
         });
 
         if (!response.ok) {
-            const error = await response.json();
-            throw new Error(error.detail || 'Update failed');
+            const errorText = await response.text();
+            throw new Error(`Failed to ${action}: ${errorText}`);
         }
 
         const result = await response.json();
 
-        // Show success message
-        alert(`${result.message}\n\nSnapshot Backup ID: ${result.snapshot.id}\nFilename: ${result.snapshot.filename}\n\nThe application is updating and will restart automatically.`);
+        if (result.update_mode === 'automatic') {
+            // Automatic update - app will restart
+            alert(`${result.message}\n\nSnapshot Backup: ${result.snapshot.filename}\n\nThe application will restart automatically. Please wait a moment and refresh the page.`);
 
-        // Poll for update status
-        pollUpdateStatus();
+            // Poll for update status
+            pollUpdateStatus();
+        } else {
+            // Manual update - show instructions
+            progressDiv.style.display = 'none';
+            if (checkBtn) checkBtn.disabled = false;
+
+            const instructions = result.instructions.join('\n');
+            const message = `${result.message}\n\n${instructions}\n\nSnapshot Backup: ${result.snapshot.filename}`;
+
+            // Show instructions in a better format
+            if (confirm(message + '\n\nWould you like to download the update script?')) {
+                // Download the script
+                window.location.href = `/api/admin/backups/download/${result.update_script}`;
+            }
+        }
 
     } catch (error) {
-        console.error('Error installing update:', error);
-
-        // Re-enable buttons and hide progress
-        document.getElementById('install-update-btn').disabled = false;
-        document.getElementById('check-update-btn').disabled = false;
+        console.error(`Error during ${action}:`, error);
         document.getElementById('update-progress').style.display = 'none';
-        document.getElementById('update-status-text').innerHTML = '<span style="color: #f44336;">Update Failed</span>';
-
-        alert(`Failed to install update: ${error.message}`);
+        const checkBtn = document.getElementById('check-update-btn');
+        if (checkBtn) checkBtn.disabled = false;
+        alert(`Failed to ${action} to version ${version}: ${error.message}`);
     }
 }
 
@@ -1137,7 +1251,7 @@ async function pollUpdateStatus() {
         try {
             const response = await fetch('/api/admin/update-status', {
                 headers: {
-                    'Authorization': `Bearer ${localStorage.getItem('adminToken')}`
+                    'Authorization': `Bearer ${adminToken}`
                 }
             });
 
@@ -1169,10 +1283,17 @@ async function pollUpdateStatus() {
     }, 5000); // Poll every 5 seconds
 }
 
-// Check for updates on dashboard load
-if (document.getElementById('update-card')) {
-    checkForUpdates();
-}
+// Check for updates on dashboard load (after DOMContentLoaded)
+document.addEventListener('DOMContentLoaded', () => {
+    if (document.getElementById('update-card')) {
+        // Wait a bit to ensure adminToken is initialized
+        setTimeout(() => {
+            if (adminToken) {
+                loadAllReleases();
+            }
+        }, 100);
+    }
+});
 
 // ============================================
 // Theme Management
