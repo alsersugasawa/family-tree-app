@@ -1,4 +1,4 @@
-# Family Tree Web Application v4.0.1
+# Family Tree Web Application v4.0.2
 
 A full-stack web application for creating and managing interactive family trees with multi-tree support, sharing, theme customization, and comprehensive admin dashboard.
 
@@ -15,12 +15,14 @@ A full-stack web application for creating and managing interactive family trees 
 - **Admin Portal** - User management, backups, system monitoring, updates
 - **Responsive Design** - Mobile-friendly Bootstrap 5.3 interface
 
-## What's New in v4.0.1
+## What's New in v4.0.2
 
-- **Kubernetes Deployment Support** - Production-ready K8s manifests with HPA, ingress, and persistent storage
-- **Database Storage for Images** - Profile pictures stored in PostgreSQL as base64 (no file system dependencies)
-- **Enhanced Documentation** - Streamlined README, comprehensive USER_GUIDE.md, and k8s/README.md
-- **Improved Containerization** - Verified Docker build with all dependencies and automatic migrations
+- **Customizable App Name** - Set your own application name during initial setup (e.g., "Smith Family Tree")
+- **Initial Setup Wizard** - Beautiful 3-step wizard for first-time admin account creation
+- **Multi-Version Update System** - View all available releases and update or rollback to any version
+- **Docker-Aware Updates** - Automated update scripts for Docker deployments with migration support
+- **Enhanced Admin Portal** - Releases table showing version history with update/rollback actions
+- **Fixed Family Member Display** - Resolved tree_id schema issue preventing members from appearing in diagrams
 
 See [CHANGELOG.md](CHANGELOG.md) for complete version history.
 

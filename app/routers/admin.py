@@ -29,7 +29,7 @@ from pydantic import BaseModel
 
 router = APIRouter(prefix="/api/admin", tags=["admin"])
 
-APP_VERSION = "4.0.1"
+APP_VERSION = "4.0.2"
 START_TIME = datetime.utcnow()
 
 

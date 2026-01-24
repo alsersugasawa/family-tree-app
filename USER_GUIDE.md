@@ -1,4 +1,4 @@
-# Family Tree App - User Guide v4.0.1
+# Family Tree App - User Guide v4.0.2
 
 Complete user guide for the Family Tree Web Application.
 
@@ -24,12 +24,20 @@ Complete user guide for the Family Tree Web Application.
 
 ### First Time Setup
 
-1. **Access the Application**
+**New in v4.0.2**: The application now supports custom branding! You can set your own application name during the initial setup.
+
+1. **Admin Setup (First Deployment)**
+   - When you first deploy the application, you'll be redirected to the setup wizard
+   - Follow the 3-step wizard to create the admin account (see [Admin Portal](#admin-portal) section)
+   - Set your custom application name (e.g., "Smith Family Heritage")
+   - This name appears throughout the application (login page, headers, titles)
+
+2. **Access the Application**
    - Open your web browser
    - Navigate to `http://localhost:8080`
-   - You'll see the login/registration page
+   - You'll see the login/registration page with your custom app name
 
-2. **Create Your Account**
+3. **Create Your Account**
    - Click "Register here" on the login page
    - Enter:
      - Username (unique identifier)
@@ -38,7 +46,7 @@ Complete user guide for the Family Tree Web Application.
    - Click "Register"
    - You'll be automatically logged in
 
-3. **Your Default Tree**
+4. **Your Default Tree**
    - Upon first login, a default tree "My Family Tree" is created automatically
    - You're ready to start adding family members!
 
@@ -482,15 +490,37 @@ Save different layouts of your tree.
 
 ### First-Time Admin Setup
 
-If no admin exists:
-1. Visit admin login page
-2. You'll see setup form
-3. Create admin account:
-   - Username
-   - Email
-   - Password
-4. Click "Create Admin"
-5. Log in with new credentials
+**New in v4.0.2**: Beautiful 3-step setup wizard
+
+If no admin exists, you'll be automatically redirected to the setup wizard:
+
+**Step 1: Welcome**
+- Introduction to the Family Tree App
+- Overview of what you'll configure
+- Click "Get Started"
+
+**Step 2: Create Admin Account**
+1. **Application Name** (required)
+   - Enter your custom application name
+   - Examples: "Smith Family Tree", "Johnson Heritage", "Miller Family Archive"
+   - This name appears throughout the application
+   - 2-50 characters required
+   - Default: "Family Tree"
+
+2. **Admin Account Details**
+   - Username (3+ characters)
+   - Email address (valid format required)
+   - Password (8+ characters, mix of letters/numbers/symbols)
+   - Confirm Password (must match)
+   - Real-time validation with error messages
+
+3. Click "Create Account"
+
+**Step 3: Success**
+- Confirmation message
+- Admin account created
+- Custom app name saved
+- Click "Go to Admin Login" to access the portal
 
 ### Dashboard
 
@@ -513,10 +543,10 @@ View system statistics:
 - File Storage
 
 **Application Updates:**
-- Current version
-- Latest available version
-- Check for updates
-- Install updates button
+- Current version display
+- Releases table with all available versions
+- Update to newer versions
+- Rollback to older versions
 
 ### User Management
 
@@ -571,25 +601,61 @@ View system statistics:
 
 ### Application Updates
 
-**Check for Updates:**
-1. Dashboard shows current version
-2. Click "Check for Updates"
-3. System checks GitHub releases
-4. Shows available updates
+**New in v4.0.2**: Multi-version update and rollback system
 
-**Install Update:**
-1. Click "Install Update"
-2. Automatic snapshot backup created
-3. Update downloads and installs
-4. Application restarts automatically
-5. Database migrations run
-6. Reload page when complete
+**View Available Releases:**
+1. Click "Updates" in the admin dashboard
+2. The releases table displays:
+   - Version number (e.g., v4.0.2)
+   - Release date
+   - Status (Current, Newer, Older)
+   - Action buttons (Update/Rollback)
 
-**Rollback (if needed):**
-1. Go to Backups section
-2. Find snapshot created before update
-3. Restore from backup
-4. Restart application
+**Update to Newer Version:**
+1. Find the desired version in the releases table
+2. Click the "Update" button (blue, with download icon)
+3. System generates an update script
+4. Two update modes available:
+
+   **Manual Mode (Default - Recommended):**
+   - Download the generated bash script
+   - Run script from Docker host: `bash update_to_vX.X.X.sh`
+   - Script performs:
+     - Stops containers
+     - Pulls new Docker image from Docker Hub
+     - Updates docker-compose.yml
+     - Restarts containers
+     - Runs database migrations
+
+   **Automatic Mode (Advanced - Requires Docker Socket):**
+   - Uncomment Docker socket mount in docker-compose.yml
+   - Click "Install Update" in admin portal
+   - Update runs automatically inside container
+   - ⚠️ Warning: Gives container access to Docker daemon
+
+5. Wait for update to complete
+6. Reload admin portal
+7. Verify new version in dashboard
+
+**Rollback to Previous Version:**
+1. Find the older version in the releases table
+2. Click the "Rollback" button (yellow, with counterclockwise icon)
+3. Follow same process as update
+4. System installs the older version
+5. Database migrations are idempotent (safe to run multiple times)
+
+**Update Safety:**
+- Database persists across updates (stored in Docker volume)
+- All data remains intact during version changes
+- SQL migrations handle schema changes
+- No data loss when updating or rolling back
+
+**Troubleshooting Updates:**
+- If update fails, containers remain in previous state
+- Check Docker logs: `docker-compose logs -f web`
+- Verify Docker Hub image exists for target version
+- Ensure internet connection for image download
+- Manual mode is safer for production environments
 
 ---
 

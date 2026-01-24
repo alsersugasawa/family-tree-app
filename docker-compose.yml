@@ -24,7 +24,7 @@ services:
   # FastAPI Application
   web:
     # For production/updates: use image from Docker Hub (uncomment 'image' and comment 'build')
-    # image: alsersugasawa/family-tree-app:v4.0.1
+    # image: alsersugasawa/family-tree-app:v4.0.2
     # For development: build from source
     build: .
     container_name: familytree-web
