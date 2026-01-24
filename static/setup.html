@@ -379,6 +379,19 @@
 
                 <form id="setupForm">
                     <div class="form-group">
+                        <label for="appName">
+                            Application Name <span class="required">*</span>
+                        </label>
+                        <input type="text" id="appName" name="appName" required
+                               placeholder="e.g., Smith Family Tree, Johnson Heritage"
+                               value="Family Tree">
+                        <div class="error-message" id="app-name-error"></div>
+                        <div style="font-size: 13px; color: #666; margin-top: 6px;">
+                            <i class="bi bi-info-circle"></i> This name will appear throughout the application
+                        </div>
+                    </div>
+
+                    <div class="form-group">
                         <label for="username">
                             Username <span class="required">*</span>
                         </label>
@@ -551,6 +564,7 @@
         }
 
         function validateAndSubmit() {
+            const appName = document.getElementById('appName').value.trim();
             const username = document.getElementById('username').value.trim();
             const email = document.getElementById('email').value.trim();
             const password = document.getElementById('password').value;
@@ -564,6 +578,15 @@
             document.querySelectorAll('input').forEach(el => el.classList.remove('error'));
 
             let isValid = true;
+
+            // Validate app name
+            if (appName.length < 2) {
+                showError('app-name', 'Application name must be at least 2 characters');
+                isValid = false;
+            } else if (appName.length > 50) {
+                showError('app-name', 'Application name must be 50 characters or less');
+                isValid = false;
+            }
 
             // Validate username
             if (username.length < 3) {
@@ -600,19 +623,19 @@
             }
 
             if (isValid) {
-                submitSetup(username, email, password);
+                submitSetup(appName, username, email, password);
             }
         }
 
         function showError(fieldName, message) {
             const errorEl = document.getElementById(`${fieldName}-error`);
-            const inputEl = document.getElementById(fieldName) || document.getElementById('confirmPassword');
+            const inputEl = document.getElementById(fieldName) || document.getElementById('confirmPassword') || document.getElementById('appName');
             errorEl.textContent = message;
             errorEl.classList.add('show');
             inputEl.classList.add('error');
         }
 
-        async function submitSetup(username, email, password) {
+        async function submitSetup(appName, username, email, password) {
             const btn = document.getElementById('createAccountBtn');
             const originalText = btn.innerHTML;
             btn.disabled = true;
@@ -625,6 +648,7 @@
                         'Content-Type': 'application/json'
                     },
                     body: JSON.stringify({
+                        app_name: appName,
                         username: username,
                         email: email,
                         password: password

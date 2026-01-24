@@ -15,7 +15,7 @@ from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
 import base64
 from app.database import get_db
-from app.models import User, SystemLog, Backup, FamilyMember, TreeView, FamilyTree, TreeShare
+from app.models import User, SystemLog, Backup, FamilyMember, TreeView, FamilyTree, TreeShare, AppConfig
 from app.schemas import (
     AdminUserCreate, AdminUserUpdate, AdminUserResponse,
     SystemLogResponse, BackupCreate, BackupResponse,
@@ -67,6 +67,21 @@ async def check_first_run_endpoint(db: AsyncSession = Depends(get_db)):
     return {"is_first_run": is_first_run}
 
 
+@router.get("/config")
+async def get_app_config(db: AsyncSession = Depends(get_db)):
+    """Get application configuration (public endpoint)"""
+    # Get app name
+    result = await db.execute(
+        select(AppConfig).where(AppConfig.key == "app_name")
+    )
+    app_name_config = result.scalar_one_or_none()
+    app_name = app_name_config.value if app_name_config else "Family Tree"
+
+    return {
+        "app_name": app_name
+    }
+
+
 @router.post("/setup", response_model=AdminUserResponse)
 async def setup_admin(
     admin_data: AdminSetup,
@@ -97,6 +112,23 @@ async def setup_admin(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Email already registered"
         )
+
+    # Save app configuration (app name)
+    app_config_result = await db.execute(
+        select(AppConfig).where(AppConfig.key == "app_name")
+    )
+    app_config = app_config_result.scalar_one_or_none()
+
+    if app_config:
+        # Update existing config
+        app_config.value = admin_data.app_name
+    else:
+        # Create new config
+        app_config = AppConfig(
+            key="app_name",
+            value=admin_data.app_name
+        )
+        db.add(app_config)
 
     # Create admin user
     hashed_password = get_password_hash(admin_data.password)

@@ -207,6 +207,7 @@ class DashboardStats(BaseModel):
 
 
 class AdminSetup(BaseModel):
+    app_name: str
     username: str
     email: EmailStr
     password: str
