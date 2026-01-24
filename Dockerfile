@@ -24,10 +24,10 @@ COPY requirements.txt .
 # Install Python dependencies
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Copy application code
-COPY ./app ./app
-COPY ./static ./static
-COPY ./migrations ./migrations
+# Copy application code from src/
+COPY ./src/app ./app
+COPY ./src/static ./static
+COPY ./src/migrations ./migrations
 
 # Create backups directory (profile pictures now stored in database)
 RUN mkdir -p /app/backups

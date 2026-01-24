@@ -37,9 +37,9 @@ services:
       db:
         condition: service_healthy
     volumes:
-      - ./app:/app/app
-      - ./static:/app/static
-      - ./migrations:/app/migrations
+      - ./src/app:/app/app
+      - ./src/static:/app/static
+      - ./src/migrations:/app/migrations
       - ./backups:/app/backups
       # Optional: Enable automatic updates (advanced users only)
       # WARNING: Mounting Docker socket gives the container access to Docker daemon

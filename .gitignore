@@ -49,3 +49,15 @@ Thumbs.db
 # Backups (Development)
 backups/
 *.sql
+
+# Test coverage
+.coverage
+htmlcov/
+.pytest_cache/
+coverage.xml
+
+# Build artifacts
+*.pyc
+*.pyo
+dist/
+build/
