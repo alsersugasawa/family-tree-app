@@ -1037,10 +1037,8 @@ async function checkForUpdates() {
 
         if (!response.ok) {
             if (response.status === 401) {
-                // Token expired or invalid
-                alert('Your session has expired. Please log in again.');
-                logout();
-                return;
+                // Token expired or invalid - just throw error, don't logout
+                throw new Error('Session expired. Please refresh the page and log in again.');
             }
             const errorText = await response.text();
             console.error('Response error:', errorText);
@@ -1181,10 +1179,17 @@ async function pollUpdateStatus() {
     }, 5000); // Poll every 5 seconds
 }
 
-// Check for updates on dashboard load
-if (document.getElementById('update-card')) {
-    checkForUpdates();
-}
+// Check for updates on dashboard load (after DOMContentLoaded)
+document.addEventListener('DOMContentLoaded', () => {
+    if (document.getElementById('update-card')) {
+        // Wait a bit to ensure adminToken is initialized
+        setTimeout(() => {
+            if (adminToken) {
+                checkForUpdates();
+            }
+        }, 100);
+    }
+});
 
 // ============================================
 // Theme Management
