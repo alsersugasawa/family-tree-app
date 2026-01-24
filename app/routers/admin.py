@@ -25,11 +25,17 @@ from app.auth import (
     get_current_admin_user, get_password_hash, check_first_run
 )
 from app.config import backup_settings
+from pydantic import BaseModel
 
 router = APIRouter(prefix="/api/admin", tags=["admin"])
 
 APP_VERSION = "4.0.1"
 START_TIME = datetime.utcnow()
+
+
+# Request models
+class UpdateRequest(BaseModel):
+    version: str
 
 
 # Helper function to log actions
@@ -1194,25 +1200,29 @@ async def get_all_releases(
 
 @router.post("/update")
 async def trigger_update(
+    update_request: UpdateRequest,
     request: Request,
     current_admin: User = Depends(get_current_admin_user),
     db: AsyncSession = Depends(get_db)
 ):
     """
-    Trigger application update from GitHub.
-    This creates a snapshot backup, downloads the latest release, and triggers a restart.
+    Trigger application update to a specific version.
+    Works with Docker-based deployments by updating the image tag and restarting containers.
+    Creates a snapshot backup before the update for safety.
     """
     try:
+        target_version = update_request.version
+
         # Log the update initiation
         await log_action(
-            db, "WARNING", "Application update initiated",
+            db, "WARNING", f"Application update to version {target_version} initiated",
             user_id=current_admin.id, action="update_initiated",
             ip_address=request.client.host if request else None
         )
 
         # Create automatic backup before update
         timestamp = datetime.utcnow().strftime("%Y%m%d_%H%M%S")
-        snapshot_filename = f"snapshot_before_update_{timestamp}.sql"
+        snapshot_filename = f"snapshot_before_update_{target_version}_{timestamp}.sql"
         snapshot_filepath = os.path.join(backup_settings.backup_dir, snapshot_filename)
 
         # Create database snapshot
@@ -1249,71 +1259,207 @@ async def trigger_update(
         await db.commit()
         await db.refresh(snapshot_record)
 
-        # Create update script
-        update_script_path = "/tmp/update_app.sh"
+        # Create update script that can be run from host or inside container (if Docker socket mounted)
+        # Save to backups directory so it's accessible from host
+        update_script_path = os.path.join(backup_settings.backup_dir, f"update_to_{target_version}.sh")
+
         with open(update_script_path, 'w') as f:
-            f.write("""#!/bin/bash
+            f.write(f"""#!/bin/bash
 # Family Tree Application Update Script
+# Target Version: {target_version}
+# Generated: {datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S")} UTC
+#
+# USAGE:
+#   From host machine: cd /path/to/my-web-app && bash backups/update_to_{target_version}.sh
+#
+# This script will:
+#   1. Update docker-compose.yml to use version v{target_version}
+#   2. Pull the new Docker image
+#   3. Run any pending database migrations
+#   4. Recreate the web container with the new version
+#   5. Rollback automatically if anything fails
+
 set -e
 
-echo "Starting application update..."
+TARGET_VERSION="{target_version}"
+IMAGE_TAG="v${{TARGET_VERSION}}"
+COMPOSE_FILE="docker-compose.yml"
 
-# Navigate to app directory
-cd /app/..
+echo "========================================="
+echo "Family Tree App Update Script"
+echo "Target Version: ${{TARGET_VERSION}}"
+echo "========================================="
+echo ""
 
-# Pull latest changes from GitHub
-echo "Pulling latest changes from GitHub..."
-if [ -d ".git" ]; then
-    git fetch origin main
-    git reset --hard origin/main
-else
-    echo "Not a git repository. Skipping git pull."
+# Check if we're in the right directory
+if [ ! -f "$COMPOSE_FILE" ]; then
+    echo "ERROR: docker-compose.yml not found in current directory"
+    echo "Please run this script from the my-web-app directory:"
+    echo "  cd /path/to/my-web-app && bash backups/update_to_{target_version}.sh"
+    exit 1
 fi
 
-# Install/update Python dependencies
-echo "Updating Python dependencies..."
-pip install --no-cache-dir -r requirements.txt
+# Check if docker and docker-compose are available
+if ! command -v docker &> /dev/null; then
+    echo "ERROR: docker command not found. Please install Docker."
+    exit 1
+fi
 
-# Run database migrations
-echo "Running database migrations..."
-cd /app
-alembic upgrade head
+if ! command -v docker-compose &> /dev/null && ! docker compose version &> /dev/null 2>&1; then
+    echo "ERROR: docker-compose not found. Please install docker-compose."
+    exit 1
+fi
 
-echo "Update complete. Restarting application..."
+# Use docker-compose or docker compose
+DOCKER_COMPOSE="docker-compose"
+if ! command -v docker-compose &> /dev/null; then
+    DOCKER_COMPOSE="docker compose"
+fi
 
-# Touch a file to trigger uvicorn reload (if using --reload)
-touch /app/main.py
+echo "Step 1: Backing up docker-compose.yml..."
+cp docker-compose.yml docker-compose.yml.backup
 
-echo "Application updated successfully!"
+echo "Step 2: Updating image tag to ${{IMAGE_TAG}}..."
+# Update image tag in docker-compose.yml
+if [[ "$OSTYPE" == "darwin"* ]]; then
+    # macOS
+    sed -i '' "s|image: alsersugasawa/family-tree-app:v[0-9.]*|image: alsersugasawa/family-tree-app:${{IMAGE_TAG}}|g" docker-compose.yml
+else
+    # Linux
+    sed -i "s|image: alsersugasawa/family-tree-app:v[0-9.]*|image: alsersugasawa/family-tree-app:${{IMAGE_TAG}}|g" docker-compose.yml
+fi
+
+echo "Step 3: Pulling Docker image alsersugasawa/family-tree-app:${{IMAGE_TAG}}..."
+if ! docker pull alsersugasawa/family-tree-app:${{IMAGE_TAG}}; then
+    echo "ERROR: Failed to pull image. Version ${{TARGET_VERSION}} may not exist on Docker Hub."
+    echo "Restoring backup..."
+    mv docker-compose.yml.backup docker-compose.yml
+    exit 1
+fi
+
+echo "Step 4: Running database migrations..."
+if [ -d "./migrations" ]; then
+    for migration_file in ./migrations/*.sql; do
+        if [ -f "$migration_file" ]; then
+            echo "  Applying: $(basename $migration_file)"
+            docker exec familytree-db psql -U postgres -d familytree < "$migration_file" 2>&1 | grep -v "already exists" | grep -v "duplicate" || true
+        fi
+    done
+    echo "  Migrations complete"
+else
+    echo "  No migrations directory found, skipping"
+fi
+
+echo "Step 5: Restarting web container with new version..."
+$DOCKER_COMPOSE up -d --no-deps --force-recreate web
+
+echo "Step 6: Waiting for application to start..."
+sleep 5
+
+# Check if container is running
+if docker ps --filter "name=familytree-web" --filter "status=running" | grep -q familytree-web; then
+    echo ""
+    echo "========================================="
+    echo "SUCCESS! Update complete"
+    echo "Application is now running version ${{TARGET_VERSION}}"
+    echo "========================================="
+    echo ""
+    echo "Backup file saved: docker-compose.yml.backup"
+    echo "You can remove it once you've verified the update: rm docker-compose.yml.backup"
+    exit 0
+else
+    echo ""
+    echo "========================================="
+    echo "ERROR: Container failed to start"
+    echo "========================================="
+    echo ""
+    echo "Rolling back to previous version..."
+    mv docker-compose.yml.backup docker-compose.yml
+    $DOCKER_COMPOSE up -d --no-deps web
+    echo "Rollback complete. Please check the logs: docker logs familytree-web"
+    exit 1
+fi
 """)
 
         # Make script executable
         os.chmod(update_script_path, 0o755)
 
-        # Execute update script in background
-        subprocess.Popen(
-            ["/bin/bash", update_script_path],
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            start_new_session=True
-        )
+        # Determine if we can auto-update (check if docker socket is accessible)
+        can_auto_update = os.path.exists("/var/run/docker.sock")
 
-        # Log successful update trigger
-        await log_action(
-            db, "WARNING", f"Application update triggered. Snapshot backup created: {snapshot_filename}",
-            user_id=current_admin.id, action="update_triggered",
-            details={"snapshot_id": snapshot_record.id},
-            ip_address=request.client.host if request else None
-        )
+        update_script_name = f"update_to_{target_version}.sh"
 
-        return {
-            "message": "Update initiated. Application will restart automatically.",
-            "snapshot": {
-                "id": snapshot_record.id,
-                "filename": snapshot_filename,
-                "message": "A snapshot backup was created before the update"
+        if can_auto_update:
+            # Try to execute update automatically
+            try:
+                # Execute update script in background
+                log_file_path = os.path.join(backup_settings.backup_dir, f"update_{target_version}.log")
+                subprocess.Popen(
+                    ["/bin/bash", update_script_path],
+                    stdout=open(log_file_path, "w"),
+                    stderr=subprocess.STDOUT,
+                    start_new_session=True
+                )
+
+                # Log successful update trigger
+                await log_action(
+                    db, "WARNING", f"Automatic update to version {target_version} initiated. Snapshot backup: {snapshot_filename}",
+                    user_id=current_admin.id, action="update_auto_triggered",
+                    details={"snapshot_id": snapshot_record.id, "target_version": target_version, "update_script": update_script_name},
+                    ip_address=request.client.host if request else None
+                )
+
+                return {
+                    "message": f"Update to version {target_version} initiated. Application will restart automatically in a few moments.",
+                    "target_version": target_version,
+                    "update_mode": "automatic",
+                    "update_log": f"backups/update_{target_version}.log",
+                    "snapshot": {
+                        "id": snapshot_record.id,
+                        "filename": snapshot_filename,
+                        "message": "A snapshot backup was created before the update"
+                    }
+                }
+            except Exception as e:
+                # Fall back to manual mode if auto-update fails
+                can_auto_update = False
+
+        # Manual update mode
+        if not can_auto_update:
+            # Log manual update preparation
+            await log_action(
+                db, "INFO", f"Update script generated for version {target_version}. Manual execution required.",
+                user_id=current_admin.id, action="update_manual_prepared",
+                details={"snapshot_id": snapshot_record.id, "target_version": target_version, "update_script": update_script_name},
+                ip_address=request.client.host if request else None
+            )
+
+            # Get the absolute path hint for the user
+            backup_dir_hint = backup_settings.backup_dir.replace("/app/", "")
+
+            return {
+                "message": f"Update prepared for version {target_version}. Please run the update script manually.",
+                "target_version": target_version,
+                "update_mode": "manual",
+                "instructions": [
+                    "A snapshot backup has been created for safety.",
+                    f"To complete the update, run this command from your my-web-app directory:",
+                    f"  bash {backup_dir_hint}/{update_script_name}",
+                    "",
+                    "The script will:",
+                    "  1. Update docker-compose.yml to use the new version",
+                    "  2. Pull the new Docker image",
+                    "  3. Run database migrations",
+                    "  4. Restart the application",
+                    "  5. Rollback automatically if anything fails"
+                ],
+                "update_script": update_script_name,
+                "snapshot": {
+                    "id": snapshot_record.id,
+                    "filename": snapshot_filename,
+                    "message": "A snapshot backup was created before the update"
+                }
             }
-        }
 
     except HTTPException:
         raise

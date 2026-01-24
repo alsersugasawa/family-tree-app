@@ -1175,7 +1175,7 @@ function compareVersions(v1, v2) {
 
 async function installSpecificVersion(version, action) {
     const actionText = action === 'update' ? 'update to' : 'rollback to';
-    const confirmMsg = `This will ${actionText} version ${version}.\n\nA snapshot backup will be created automatically before the ${action}.\n\nThe application will restart during this process.\n\nDo you want to proceed?`;
+    const confirmMsg = `This will ${actionText} version ${version}.\n\nA snapshot backup will be created automatically before the ${action}.\n\nDo you want to proceed?`;
 
     if (!confirm(confirmMsg)) {
         return;
@@ -1183,7 +1183,10 @@ async function installSpecificVersion(version, action) {
 
     try {
         const progressDiv = document.getElementById('update-progress');
+        const checkBtn = document.getElementById('check-update-btn');
+
         progressDiv.style.display = 'block';
+        if (checkBtn) checkBtn.disabled = true;
 
         const response = await fetch('/api/admin/update', {
             method: 'POST',
@@ -1199,12 +1202,34 @@ async function installSpecificVersion(version, action) {
             throw new Error(`Failed to ${action}: ${errorText}`);
         }
 
-        // Poll for update status
-        pollUpdateStatus();
+        const result = await response.json();
+
+        if (result.update_mode === 'automatic') {
+            // Automatic update - app will restart
+            alert(`${result.message}\n\nSnapshot Backup: ${result.snapshot.filename}\n\nThe application will restart automatically. Please wait a moment and refresh the page.`);
+
+            // Poll for update status
+            pollUpdateStatus();
+        } else {
+            // Manual update - show instructions
+            progressDiv.style.display = 'none';
+            if (checkBtn) checkBtn.disabled = false;
+
+            const instructions = result.instructions.join('\n');
+            const message = `${result.message}\n\n${instructions}\n\nSnapshot Backup: ${result.snapshot.filename}`;
+
+            // Show instructions in a better format
+            if (confirm(message + '\n\nWould you like to download the update script?')) {
+                // Download the script
+                window.location.href = `/api/admin/backups/download/${result.update_script}`;
+            }
+        }
 
     } catch (error) {
         console.error(`Error during ${action}:`, error);
         document.getElementById('update-progress').style.display = 'none';
+        const checkBtn = document.getElementById('check-update-btn');
+        if (checkBtn) checkBtn.disabled = false;
         alert(`Failed to ${action} to version ${version}: ${error.message}`);
     }
 }

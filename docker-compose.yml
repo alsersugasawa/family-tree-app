@@ -23,6 +23,9 @@ services:
 
   # FastAPI Application
   web:
+    # For production/updates: use image from Docker Hub (uncomment 'image' and comment 'build')
+    # image: alsersugasawa/family-tree-app:v4.0.1
+    # For development: build from source
     build: .
     container_name: familytree-web
     command: ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
@@ -38,6 +41,10 @@ services:
       - ./static:/app/static
       - ./migrations:/app/migrations
       - ./backups:/app/backups
+      # Optional: Enable automatic updates (advanced users only)
+      # WARNING: Mounting Docker socket gives the container access to Docker daemon
+      # - /var/run/docker.sock:/var/run/docker.sock
+      # - ./docker-compose.yml:/app/docker-compose.yml:ro
       # To use external storage, change the path above:
       # - /your/backup/path:/app/backups
       # Optional: Mount SMB/NFS shares (uncomment and configure if using)
