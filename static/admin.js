@@ -1027,7 +1027,7 @@ async function checkForUpdates() {
 
         const response = await fetch('/api/admin/version', {
             headers: {
-                'Authorization': `Bearer ${localStorage.getItem('adminToken')}`
+                'Authorization': `Bearer ${adminToken}`
             }
         });
 
@@ -1089,7 +1089,7 @@ async function installUpdate() {
         const response = await fetch('/api/admin/update', {
             method: 'POST',
             headers: {
-                'Authorization': `Bearer ${localStorage.getItem('adminToken')}`,
+                'Authorization': `Bearer ${adminToken}`,
                 'Content-Type': 'application/json'
             }
         });
@@ -1137,7 +1137,7 @@ async function pollUpdateStatus() {
         try {
             const response = await fetch('/api/admin/update-status', {
                 headers: {
-                    'Authorization': `Bearer ${localStorage.getItem('adminToken')}`
+                    'Authorization': `Bearer ${adminToken}`
                 }
             });
 
