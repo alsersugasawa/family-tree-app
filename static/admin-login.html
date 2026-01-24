@@ -274,8 +274,24 @@
             }
         }
 
-        // Check if already logged in
-        window.addEventListener('DOMContentLoaded', () => {
+        // Check if this is first run or if already logged in
+        window.addEventListener('DOMContentLoaded', async () => {
+            // First, check if this is the first run (no admin exists)
+            try {
+                const firstRunResponse = await fetch(`${API_BASE}/api/admin/check-first-run`);
+                if (firstRunResponse.ok) {
+                    const firstRunData = await firstRunResponse.json();
+                    if (firstRunData.is_first_run) {
+                        // Redirect to setup wizard
+                        window.location.href = '/static/setup.html';
+                        return;
+                    }
+                }
+            } catch (error) {
+                console.error('Error checking first run:', error);
+            }
+
+            // Check if already logged in
             const token = localStorage.getItem('admin_token');
             if (token) {
                 // Verify token is still valid
