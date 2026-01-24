@@ -1,0 +1,24 @@
+name: Patch Release - Bug Fixes
+
+on:
+  push:
+    tags:
+      - 'v[0-9]+.[0-9]+.[1-9]*'  # Matches v4.0.1, v4.0.2, etc. (patch versions)
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Patch version number (e.g., 4.0.3)'
+        required: true
+        type: string
+
+jobs:
+  release:
+    name: Create Patch Release
+    uses: ./.github/workflows/release-template.yml
+    with:
+      version: ${{ github.event.inputs.version || github.ref_name }}
+      release_type: 'patch'
+      release_title: 'Bug Fixes & Security Updates'
+    secrets:
+      DOCKER_USERNAME: ${{ secrets.DOCKER_USERNAME }}
+      DOCKER_PASSWORD: ${{ secrets.DOCKER_PASSWORD }}

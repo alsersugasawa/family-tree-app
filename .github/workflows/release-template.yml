@@ -1,0 +1,337 @@
+name: Reusable Release Workflow
+
+on:
+  workflow_call:
+    inputs:
+      version:
+        description: 'Version number (e.g., 4.0.2)'
+        required: true
+        type: string
+      release_type:
+        description: 'Type of release: major, minor, or patch'
+        required: true
+        type: string
+      release_title:
+        description: 'Title for the GitHub release'
+        required: false
+        type: string
+        default: ''
+      release_notes:
+        description: 'Additional release notes'
+        required: false
+        type: string
+        default: ''
+    secrets:
+      DOCKER_USERNAME:
+        required: false
+      DOCKER_PASSWORD:
+        required: false
+    outputs:
+      version:
+        description: "The version that was released"
+        value: ${{ jobs.create-release.outputs.version }}
+      docker_tags:
+        description: "Docker tags that were pushed"
+        value: ${{ jobs.build-docker.outputs.tags }}
+
+jobs:
+  validate-version:
+    name: Validate Version
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.validate.outputs.version }}
+      is_valid: ${{ steps.validate.outputs.is_valid }}
+      previous_version: ${{ steps.get_previous.outputs.previous }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Validate version format
+        id: validate
+        run: |
+          VERSION="${{ inputs.version }}"
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+
+          # Validate semantic versioning format
+          if [[ ! "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "❌ Invalid version format: $VERSION"
+            echo "Must be in format: X.Y.Z (e.g., 4.0.2)"
+            exit 1
+          fi
+
+          # Extract version parts
+          MAJOR=$(echo $VERSION | cut -d. -f1)
+          MINOR=$(echo $VERSION | cut -d. -f2)
+          PATCH=$(echo $VERSION | cut -d. -f3)
+
+          echo "Version parts: MAJOR=$MAJOR, MINOR=$MINOR, PATCH=$PATCH"
+
+          # Validate release type matches version
+          if [ "${{ inputs.release_type }}" == "major" ]; then
+            if [ "$MINOR" != "0" ] || [ "$PATCH" != "0" ]; then
+              echo "❌ Major release must be X.0.0 format"
+              exit 1
+            fi
+          elif [ "${{ inputs.release_type }}" == "minor" ]; then
+            if [ "$PATCH" != "0" ]; then
+              echo "❌ Minor release must be X.Y.0 format"
+              exit 1
+            fi
+          fi
+
+          echo "is_valid=true" >> $GITHUB_OUTPUT
+          echo "✅ Version $VERSION is valid for ${{ inputs.release_type }} release"
+
+      - name: Get previous version
+        id: get_previous
+        run: |
+          PREV_TAG=$(git describe --tags --abbrev=0 HEAD^ 2>/dev/null || echo "v0.0.0")
+          PREV_VERSION="${PREV_TAG#v}"
+          echo "previous=$PREV_VERSION" >> $GITHUB_OUTPUT
+          echo "Previous version: $PREV_VERSION"
+
+  create-release:
+    name: Create GitHub Release
+    runs-on: ubuntu-latest
+    needs: validate-version
+    if: needs.validate-version.outputs.is_valid == 'true'
+    outputs:
+      version: ${{ needs.validate-version.outputs.version }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Update version in code
+        run: |
+          VERSION="${{ needs.validate-version.outputs.version }}"
+          sed -i "s/APP_VERSION = \".*\"/APP_VERSION = \"$VERSION\"/" app/routers/admin.py
+          echo "Updated APP_VERSION to $VERSION"
+
+      - name: Commit version update
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add app/routers/admin.py
+
+          if ! git diff --staged --quiet; then
+            git commit -m "chore: bump version to ${{ needs.validate-version.outputs.version }}"
+            git push origin main
+          else
+            echo "No changes to commit"
+          fi
+
+      - name: Generate changelog
+        id: changelog
+        run: |
+          PREV_TAG="v${{ needs.validate-version.outputs.previous_version }}"
+          VERSION="${{ needs.validate-version.outputs.version }}"
+
+          # Get commits since last tag
+          if git rev-parse "$PREV_TAG" >/dev/null 2>&1; then
+            FEATURES=$(git log $PREV_TAG..HEAD --pretty=format:"- %s" --no-merges | grep -iE "^- (feat|feature|add)" || echo "")
+            FIXES=$(git log $PREV_TAG..HEAD --pretty=format:"- %s" --no-merges | grep -iE "^- (fix|bug)" || echo "")
+            CHANGES=$(git log $PREV_TAG..HEAD --pretty=format:"- %s" --no-merges | grep -iE "^- (change|update|improve)" || echo "")
+            BREAKING=$(git log $PREV_TAG..HEAD --pretty=format:"- %s" --no-merges | grep -iE "^- (breaking|break)" || echo "")
+          else
+            FEATURES="- Initial release"
+            FIXES=""
+            CHANGES=""
+            BREAKING=""
+          fi
+
+          # Build changelog
+          CHANGELOG=""
+
+          if [ -n "$FEATURES" ]; then
+            CHANGELOG+="### ✨ New Features\n$FEATURES\n\n"
+          fi
+
+          if [ -n "$FIXES" ]; then
+            CHANGELOG+="### 🐛 Bug Fixes\n$FIXES\n\n"
+          fi
+
+          if [ -n "$CHANGES" ]; then
+            CHANGELOG+="### 🔄 Changes\n$CHANGES\n\n"
+          fi
+
+          if [ -n "$BREAKING" ]; then
+            CHANGELOG+="### ⚠️ Breaking Changes\n$BREAKING\n\n"
+          fi
+
+          if [ -z "$CHANGELOG" ]; then
+            CHANGELOG="- Various improvements and updates\n"
+          fi
+
+          echo "changelog<<EOF" >> $GITHUB_OUTPUT
+          echo -e "$CHANGELOG" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+
+      - name: Determine release emoji and title
+        id: release_info
+        run: |
+          RELEASE_TYPE="${{ inputs.release_type }}"
+          VERSION="${{ needs.validate-version.outputs.version }}"
+
+          if [ "$RELEASE_TYPE" == "major" ]; then
+            EMOJI="🚀"
+            DEFAULT_TITLE="Major Release - New Features"
+          elif [ "$RELEASE_TYPE" == "minor" ]; then
+            EMOJI="✨"
+            DEFAULT_TITLE="Feature Release"
+          else
+            EMOJI="🔧"
+            DEFAULT_TITLE="Patch Release - Bug Fixes"
+          fi
+
+          TITLE="${{ inputs.release_title }}"
+          if [ -z "$TITLE" ]; then
+            TITLE="$DEFAULT_TITLE"
+          fi
+
+          echo "emoji=$EMOJI" >> $GITHUB_OUTPUT
+          echo "title=$EMOJI v$VERSION - $TITLE" >> $GITHUB_OUTPUT
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: v${{ needs.validate-version.outputs.version }}
+          name: ${{ steps.release_info.outputs.title }}
+          body: |
+            # ${{ steps.release_info.outputs.title }}
+
+            **Version:** ${{ needs.validate-version.outputs.version }}
+            **Previous Version:** ${{ needs.validate-version.outputs.previous_version }}
+            **Release Type:** ${{ inputs.release_type }}
+
+            ---
+
+            ## 📝 Changelog
+
+            ${{ steps.changelog.outputs.changelog }}
+
+            ${{ inputs.release_notes }}
+
+            ---
+
+            ## 📦 Installation & Update
+
+            ### Method 1: Admin Portal (Recommended)
+            1. Log in to Admin Portal at `http://localhost:8080/static/admin-login.html`
+            2. Navigate to Dashboard → Updates
+            3. Find version **${{ needs.validate-version.outputs.version }}** in the releases table
+            4. Click **Update** button (or **Rollback** if downgrading)
+            5. Download and run the generated update script
+
+            ### Method 2: Docker Compose
+            ```bash
+            # Pull new image
+            docker pull alsersugasawa/family-tree-app:v${{ needs.validate-version.outputs.version }}
+
+            # Update docker-compose.yml to use new version
+            # Then restart
+            docker-compose down
+            docker-compose up -d
+            ```
+
+            ### Method 3: Manual Update
+            ```bash
+            # Pull latest code
+            git fetch origin main
+            git checkout main
+            git pull origin main
+
+            # Rebuild and restart
+            docker-compose up -d --build
+            ```
+
+            ---
+
+            ## 🔐 Safety Features
+
+            - ✅ Automatic database migrations
+            - ✅ Data persists across updates (Docker volumes)
+            - ✅ Zero data loss
+            - ✅ Rollback capability via admin portal
+
+            ---
+
+            ## 📖 Documentation
+
+            - [README.md](https://github.com/${{ github.repository }}/blob/main/README.md)
+            - [USER_GUIDE.md](https://github.com/${{ github.repository }}/blob/main/USER_GUIDE.md)
+            - [CHANGELOG.md](https://github.com/${{ github.repository }}/blob/main/CHANGELOG.md)
+          draft: false
+          prerelease: false
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+  build-docker:
+    name: Build and Push Docker Image
+    runs-on: ubuntu-latest
+    needs: [validate-version, create-release]
+    if: needs.validate-version.outputs.is_valid == 'true'
+    outputs:
+      tags: ${{ steps.meta.outputs.tags }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to Docker Hub
+        if: ${{ secrets.DOCKER_USERNAME != '' }}
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
+
+      - name: Extract metadata for Docker
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ secrets.DOCKER_USERNAME }}/family-tree-app
+          tags: |
+            type=semver,pattern={{version}},value=v${{ needs.validate-version.outputs.version }}
+            type=semver,pattern={{major}}.{{minor}},value=v${{ needs.validate-version.outputs.version }}
+            type=semver,pattern={{major}},value=v${{ needs.validate-version.outputs.version }}
+            type=raw,value=latest
+            type=raw,value=${{ inputs.release_type }}-latest
+
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          push: ${{ secrets.DOCKER_USERNAME != '' }}
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          platforms: linux/amd64,linux/arm64
+
+      - name: Build only (no Docker Hub credentials)
+        if: ${{ secrets.DOCKER_USERNAME == '' }}
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          push: false
+          tags: family-tree-app:v${{ needs.validate-version.outputs.version }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  notify:
+    name: Notify Release Completion
+    runs-on: ubuntu-latest
+    needs: [validate-version, create-release, build-docker]
+    if: success()
+    steps:
+      - name: Success notification
+        run: |
+          echo "🎉 Release v${{ needs.validate-version.outputs.version }} completed successfully!"
+          echo "Release Type: ${{ inputs.release_type }}"
+          echo "Docker Tags: ${{ needs.build-docker.outputs.tags }}"
+          echo "GitHub Release: https://github.com/${{ github.repository }}/releases/tag/v${{ needs.validate-version.outputs.version }}"

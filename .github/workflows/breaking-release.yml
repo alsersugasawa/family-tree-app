@@ -1,0 +1,40 @@
+name: Major Release - Breaking Changes
+
+on:
+  push:
+    tags:
+      - 'v[1-9]*.[0].[0]'  # Matches v5.0.0, v6.0.0, etc. (major versions)
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Major version number (e.g., 5.0.0)'
+        required: true
+        type: string
+      release_notes:
+        description: 'Release notes and breaking changes'
+        required: false
+        type: string
+
+jobs:
+  release:
+    name: Create Major Release
+    uses: ./.github/workflows/release-template.yml
+    with:
+      version: ${{ github.event.inputs.version || github.ref_name }}
+      release_type: 'major'
+      release_title: 'Major Release - Breaking Changes'
+      release_notes: |
+        ## ⚠️ Breaking Changes Notice
+
+        This is a **major version** release. Please review the changes carefully before updating.
+
+        ### Migration Steps
+        1. Create a full database backup
+        2. Review the changelog for breaking changes
+        3. Test in a staging environment first
+        4. Plan a maintenance window for production updates
+
+        ${{ github.event.inputs.release_notes || '' }}
+    secrets:
+      DOCKER_USERNAME: ${{ secrets.DOCKER_USERNAME }}
+      DOCKER_PASSWORD: ${{ secrets.DOCKER_PASSWORD }}

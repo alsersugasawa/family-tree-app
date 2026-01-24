@@ -1,0 +1,29 @@
+name: Feature Release - Minor Version
+
+on:
+  push:
+    tags:
+      - 'v[0-9]+.[1-9]*.[0]'  # Matches v4.1.0, v4.2.0, etc. (minor versions)
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Minor version number (e.g., 4.1.0)'
+        required: true
+        type: string
+      release_notes:
+        description: 'Additional release notes'
+        required: false
+        type: string
+
+jobs:
+  release:
+    name: Create Feature Release
+    uses: ./.github/workflows/release-template.yml
+    with:
+      version: ${{ github.event.inputs.version || github.ref_name }}
+      release_type: 'minor'
+      release_title: 'New Features & Enhancements'
+      release_notes: ${{ github.event.inputs.release_notes || '' }}
+    secrets:
+      DOCKER_USERNAME: ${{ secrets.DOCKER_USERNAME }}
+      DOCKER_PASSWORD: ${{ secrets.DOCKER_PASSWORD }}
