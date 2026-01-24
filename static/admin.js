@@ -1025,14 +1025,20 @@ async function checkForUpdates() {
         checkBtn.innerHTML = '<i class="bi bi-hourglass-split"></i> Checking...';
         statusText.textContent = 'Checking for updates...';
 
+        console.log('Checking for updates with token:', adminToken ? 'token present' : 'NO TOKEN');
+
         const response = await fetch('/api/admin/version', {
             headers: {
                 'Authorization': `Bearer ${adminToken}`
             }
         });
 
+        console.log('Response status:', response.status);
+
         if (!response.ok) {
-            throw new Error('Failed to check for updates');
+            const errorText = await response.text();
+            console.error('Response error:', errorText);
+            throw new Error(`Failed to check for updates: ${response.status} ${errorText}`);
         }
 
         const versionInfo = await response.json();
