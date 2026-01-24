@@ -1118,7 +1118,7 @@ async def get_version(
         try:
             import requests
             response = requests.get(
-                "https://api.github.com/repos/YOUR_GITHUB_ORG/family-tree-app/releases/latest",
+                "https://api.github.com/repos/alsersugasawa/family-tree-app/releases/latest",
                 timeout=5
             )
             if response.status_code == 200:
@@ -1135,7 +1135,7 @@ async def get_version(
             "current_version": current_version,
             "latest_version": latest_version,
             "update_available": update_available,
-            "github_repo": "YOUR_GITHUB_ORG/family-tree-app"
+            "github_repo": "alsersugasawa/family-tree-app"
         }
     except Exception as e:
         raise HTTPException(
