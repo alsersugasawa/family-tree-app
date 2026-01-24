@@ -185,12 +185,29 @@
                         A new version is ready to install.
                     </div>
                     <div style="display: flex; gap: 10px; align-items: center;">
-                        <button id="check-update-btn" onclick="checkForUpdates()" class="btn-secondary" style="flex: 1;">
+                        <button id="check-update-btn" onclick="loadAllReleases()" class="btn-secondary" style="flex: 1;">
                             <i class="bi bi-arrow-clockwise"></i> Check for Updates
                         </button>
-                        <button id="install-update-btn" onclick="installUpdate()" class="btn-primary" style="flex: 1;" disabled>
-                            <i class="bi bi-download"></i> Install Update
-                        </button>
+                    </div>
+
+                    <!-- Available Releases Table -->
+                    <div id="releases-container" style="display: none;">
+                        <h4 style="margin: 20px 0 10px 0; font-size: 16px;">Available Releases</h4>
+                        <div style="overflow-x: auto;">
+                            <table style="width: 100%; border-collapse: collapse; font-size: 13px;">
+                                <thead>
+                                    <tr style="background: #f5f5f5; border-bottom: 2px solid #ddd;">
+                                        <th style="padding: 10px; text-align: left;">Version</th>
+                                        <th style="padding: 10px; text-align: left;">Release Date</th>
+                                        <th style="padding: 10px; text-align: left;">Status</th>
+                                        <th style="padding: 10px; text-align: center;">Action</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="releases-table-body">
+                                    <!-- Populated by JavaScript -->
+                                </tbody>
+                            </table>
+                        </div>
                     </div>
                     <div id="update-progress" style="display: none;">
                         <div style="padding: 12px; background: #e3f2fd; border: 1px solid #2196f3; border-radius: 6px; color: #0d47a1;">

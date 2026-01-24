@@ -1144,6 +1144,54 @@ async def get_version(
         )
 
 
+@router.get("/releases")
+async def get_all_releases(
+    current_admin: User = Depends(get_current_admin_user)
+):
+    """Get all available releases from GitHub."""
+    try:
+        import requests
+        response = requests.get(
+            "https://api.github.com/repos/alsersugasawa/family-tree-app/releases",
+            timeout=10
+        )
+
+        if response.status_code != 200:
+            raise HTTPException(
+                status_code=status.HTTP_502_BAD_GATEWAY,
+                detail=f"Failed to fetch releases from GitHub: {response.status_code}"
+            )
+
+        releases = response.json()
+        release_list = []
+
+        for release in releases:
+            version = release.get("tag_name", "").lstrip("v")
+            release_list.append({
+                "version": version,
+                "name": release.get("name", version),
+                "published_at": release.get("published_at", ""),
+                "body": release.get("body", "No release notes available"),
+                "prerelease": release.get("prerelease", False),
+                "is_current": version == APP_VERSION
+            })
+
+        return {
+            "current_version": APP_VERSION,
+            "releases": release_list
+        }
+    except requests.exceptions.RequestException as e:
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail=f"Failed to connect to GitHub: {str(e)}"
+        )
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to fetch releases: {str(e)}"
+        )
+
+
 @router.post("/update")
 async def trigger_update(
     request: Request,
