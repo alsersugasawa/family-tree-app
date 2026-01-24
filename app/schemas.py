@@ -51,6 +51,7 @@ class FamilyMemberBase(BaseModel):
     profile_picture_mime_type: Optional[str] = None  # MIME type (e.g., 'image/jpeg')
     social_media: Optional[Dict[str, Any]] = None
     previous_partners: Optional[str] = None
+    tree_id: Optional[int] = None
     father_id: Optional[int] = None
     mother_id: Optional[int] = None
 
@@ -77,6 +78,7 @@ class FamilyMemberUpdate(BaseModel):
     profile_picture_mime_type: Optional[str] = None
     social_media: Optional[Dict[str, Any]] = None
     previous_partners: Optional[str] = None
+    tree_id: Optional[int] = None
     father_id: Optional[int] = None
     mother_id: Optional[int] = None
 
