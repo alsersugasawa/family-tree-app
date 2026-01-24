@@ -1036,6 +1036,12 @@ async function checkForUpdates() {
         console.log('Response status:', response.status);
 
         if (!response.ok) {
+            if (response.status === 401) {
+                // Token expired or invalid
+                alert('Your session has expired. Please log in again.');
+                logout();
+                return;
+            }
             const errorText = await response.text();
             console.error('Response error:', errorText);
             throw new Error(`Failed to check for updates: ${response.status} ${errorText}`);
