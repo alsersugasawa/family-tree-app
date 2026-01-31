@@ -5,6 +5,41 @@ All notable changes to the Family Tree App will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.1.0] - 2026-01-31
+
+### Added
+- **Minikube Support for Local Kubernetes Testing**
+  - Full support for deploying the application on minikube for local development and testing
+  - Automated deployment script (`deploy-to-minikube.sh`) for one-command setup
+  - Comprehensive minikube deployment guide ([MINIKUBE_DEPLOYMENT.md](MINIKUBE_DEPLOYMENT.md))
+  - Step-by-step instructions, troubleshooting tips, and management commands
+  - Support for building Docker images locally within minikube's Docker daemon
+  - No external container registry required for local testing
+
+- **Enhanced Kubernetes Configuration**
+  - Updated deployment manifests to support local image builds with `imagePullPolicy: Never`
+  - Added `TRUSTED_HOSTS` and `CORS_ORIGINS` environment variable support in ConfigMap
+  - Flexible host and CORS configuration for different Kubernetes environments
+  - Improved health check compatibility with Kubernetes internal networking
+
+- **Improved Documentation**
+  - Added minikube deployment section to main [README.md](README.md)
+  - Enhanced [k8s/README.md](k8s/README.md) with minikube-specific instructions
+  - Quick start guide for minikube deployments
+  - Detailed comparison between minikube and production Kubernetes deployments
+
+### Changed
+- Updated Kubernetes deployment to properly expose environment variables from ConfigMap
+- Modified TrustedHostMiddleware configuration to support wildcard hosts for development
+- Improved deployment script with proper error handling and status checks
+
+### Technical Details
+- Minikube deployment uses local Docker daemon via `eval $(minikube docker-env)`
+- Application accessible via `kubectl port-forward` or `minikube service` commands
+- Supports horizontal scaling (2 replicas by default)
+- PostgreSQL with persistent volume for data retention
+- Compatible with minikube v1.38.0+ and Kubernetes v1.20+
+
 ## [4.0.2] - 2026-01-24
 
 ### Added

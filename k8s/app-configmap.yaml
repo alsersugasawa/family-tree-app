@@ -7,4 +7,6 @@ metadata:
     app: family-tree-web
 data:
   DATABASE_URL: "postgresql+asyncpg://postgres:postgres@postgres:5432/familytree"
+  TRUSTED_HOSTS: "*"  # Allow all hosts in Kubernetes environment
+  CORS_ORIGINS: "*"  # Allow all origins in Kubernetes environment
   # Add other non-sensitive configuration here

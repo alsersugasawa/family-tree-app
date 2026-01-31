@@ -1,4 +1,4 @@
-# Family Tree App - User Guide v4.0.2
+# Family Tree App - User Guide v4.1.0
 
 Complete user guide for the Family Tree Web Application.
 
