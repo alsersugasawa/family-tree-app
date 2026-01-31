@@ -1,4 +1,4 @@
-# Family Tree Web Application v4.0.2
+# Family Tree Web Application v4.1.0
 
 A full-stack web application for creating and managing interactive family trees with multi-tree support, sharing, theme customization, and comprehensive admin dashboard.
 
@@ -15,14 +15,19 @@ A full-stack web application for creating and managing interactive family trees 
 - **Admin Portal** - User management, backups, system monitoring, updates
 - **Responsive Design** - Mobile-friendly Bootstrap 5.3 interface
 
-## What's New in v4.0.2
+## What's New in v4.1.0
 
-- **Customizable App Name** - Set your own application name during initial setup (e.g., "Smith Family Tree")
+- **Minikube Support** - Full support for local Kubernetes testing with minikube deployment
+- **Automated Deployment Script** - One-command deployment script for minikube environments
+- **Minikube Documentation** - Comprehensive guide for minikube setup, troubleshooting, and management
+- **Enhanced K8s Configuration** - Improved Kubernetes manifests with local image support and proper host configuration
+
+### Previous Release (v4.0.2)
+
+- **Customizable App Name** - Set your own application name during initial setup
 - **Initial Setup Wizard** - Beautiful 3-step wizard for first-time admin account creation
 - **Multi-Version Update System** - View all available releases and update or rollback to any version
-- **Docker-Aware Updates** - Automated update scripts for Docker deployments with migration support
 - **Enhanced Admin Portal** - Releases table showing version history with update/rollback actions
-- **Fixed Family Member Display** - Resolved tree_id schema issue preventing members from appearing in diagrams
 
 See [CHANGELOG.md](CHANGELOG.md) for complete version history.
 
@@ -53,9 +58,9 @@ All dependencies are included in the container.
 - Docker Compose
 
 **Option 2: Kubernetes**
-- Kubernetes cluster (v1.20+)
-- kubectl configured
-- Container registry access
+- Kubernetes cluster (v1.20+) or Minikube
+- kubectl configured (or minikube)
+- Container registry access (not needed for minikube)
 
 **Option 3: Local Development**
 - Python 3.8+
@@ -119,6 +124,36 @@ All dependencies are included in the container.
    - Scaling and autoscaling
    - Monitoring and logging
    - Production best practices
+
+#### Minikube Setup (Local Kubernetes Testing)
+
+For local Kubernetes testing and development:
+
+1. **Install Minikube**
+   ```bash
+   # See https://minikube.sigs.k8s.io/docs/start/
+   ```
+
+2. **Quick Deploy**
+   ```bash
+   # Run the automated deployment script
+   ./deploy-to-minikube.sh
+   ```
+
+3. **Access the Application**
+   ```bash
+   # Port forward (runs in background)
+   kubectl port-forward -n family-tree svc/family-tree-web 8080:80
+
+   # Or use minikube service
+   minikube service family-tree-web -n family-tree
+   ```
+
+4. **See [MINIKUBE_DEPLOYMENT.md](MINIKUBE_DEPLOYMENT.md) for:**
+   - Step-by-step deployment guide
+   - Troubleshooting tips
+   - Manual deployment steps
+   - Scaling and updates
 
 ### Option C: Local Development Setup
 

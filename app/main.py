@@ -33,7 +33,7 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(
     title="Family Tree App",
-    version="4.0.1",
+    version="4.1.0",
     lifespan=lifespan,
     # Disable automatic docs in production (OWASP ASVS 14.1.3)
     docs_url="/docs" if os.getenv("ENVIRONMENT", "development") == "development" else None,

@@ -48,17 +48,45 @@ This directory contains Kubernetes manifests for deploying the Family Tree Appli
 
 ### Required
 - Kubernetes cluster (v1.20+)
-  - Minikube (local development)
+  - **Minikube** (local development/testing) - **Recommended for local testing**
   - GKE, EKS, AKS (cloud)
   - k3s, k0s (edge/IoT)
-- kubectl configured
+- kubectl configured (or use `minikube kubectl --`)
 - Container registry access (Docker Hub, GCR, ECR, etc.)
+  - **Not required for minikube** - can build images locally
 
 ### Optional but Recommended
 - Ingress Controller (NGINX, Traefik, etc.)
 - cert-manager (for automatic TLS certificates)
 - Metrics Server (for HPA)
 - Persistent Volume provisioner
+
+## Minikube Quick Start
+
+For local Kubernetes testing with minikube, see the dedicated [MINIKUBE_DEPLOYMENT.md](../MINIKUBE_DEPLOYMENT.md) guide or use the automated deployment:
+
+```bash
+# From project root
+./deploy-to-minikube.sh
+```
+
+This script handles:
+- Starting minikube
+- Building the Docker image locally
+- Deploying all Kubernetes resources
+- Waiting for pods to be ready
+
+**Key Differences for Minikube:**
+- No container registry needed - images built in minikube's Docker daemon
+- Uses `imagePullPolicy: Never` to use local images
+- Requires `eval $(minikube docker-env)` before building images
+- Access via `kubectl port-forward` or `minikube service`
+
+For manual minikube deployment, see the sections below with these modifications:
+1. Run `eval $(minikube docker-env)` before building images
+2. Build images with: `docker build -t family-tree-app:latest .`
+3. Ensure deployment uses `imagePullPolicy: Never`
+4. Set `TRUSTED_HOSTS=*` and `CORS_ORIGINS=*` in ConfigMap
 
 ## Quick Start
 

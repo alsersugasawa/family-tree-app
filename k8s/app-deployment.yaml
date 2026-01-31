@@ -22,8 +22,8 @@ spec:
     spec:
       containers:
       - name: web
-        image: alsersugasawa/family-tree-app:v4.0.2
-        # In production, use specific version tags
+        image: family-tree-app:latest
+        imagePullPolicy: Never  # Use local image built in minikube
         ports:
         - containerPort: 8000
           name: http
@@ -33,6 +33,16 @@ spec:
             configMapKeyRef:
               name: app-config
               key: DATABASE_URL
+        - name: TRUSTED_HOSTS
+          valueFrom:
+            configMapKeyRef:
+              name: app-config
+              key: TRUSTED_HOSTS
+        - name: CORS_ORIGINS
+          valueFrom:
+            configMapKeyRef:
+              name: app-config
+              key: CORS_ORIGINS
         volumeMounts:
         - name: backups
           mountPath: /app/backups
@@ -66,7 +76,8 @@ spec:
       # Optional: Add init container to run migrations
       initContainers:
       - name: run-migrations
-        image: alsersugasawa/family-tree-app:v4.0.2
+        image: family-tree-app:latest
+        imagePullPolicy: Never  # Use local image built in minikube
         command: ['sh', '-c']
         args:
         - |
