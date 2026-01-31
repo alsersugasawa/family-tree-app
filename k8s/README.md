@@ -63,11 +63,11 @@ This directory contains Kubernetes manifests for deploying the Family Tree Appli
 
 ## Minikube Quick Start
 
-For local Kubernetes testing with minikube, see the dedicated [MINIKUBE_DEPLOYMENT.md](../MINIKUBE_DEPLOYMENT.md) guide or use the automated deployment:
+For local Kubernetes testing with minikube, see the dedicated [Minikube Deployment Guide](../docs/deployment/MINIKUBE_DEPLOYMENT.md) or use the automated deployment:
 
 ```bash
 # From project root
-./deploy-to-minikube.sh
+./scripts/deploy-to-minikube.sh
 ```
 
 This script handles:

@@ -10,8 +10,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 - **Minikube Support for Local Kubernetes Testing**
   - Full support for deploying the application on minikube for local development and testing
-  - Automated deployment script (`deploy-to-minikube.sh`) for one-command setup
-  - Comprehensive minikube deployment guide ([MINIKUBE_DEPLOYMENT.md](MINIKUBE_DEPLOYMENT.md))
+  - Automated deployment script (`scripts/deploy-to-minikube.sh`) for one-command setup
+  - Comprehensive minikube deployment guide ([docs/deployment/MINIKUBE_DEPLOYMENT.md](docs/deployment/MINIKUBE_DEPLOYMENT.md))
   - Step-by-step instructions, troubleshooting tips, and management commands
   - Support for building Docker images locally within minikube's Docker daemon
   - No external container registry required for local testing
@@ -29,9 +29,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Detailed comparison between minikube and production Kubernetes deployments
 
 ### Changed
-- Updated Kubernetes deployment to properly expose environment variables from ConfigMap
-- Modified TrustedHostMiddleware configuration to support wildcard hosts for development
-- Improved deployment script with proper error handling and status checks
+- **Repository Structure Reorganization**
+  - Reorganized folder structure following industry best practices
+  - Moved all documentation to `docs/` directory with organized subdirectories
+  - Created `scripts/` directory for deployment and utility scripts
+  - Improved `.github/` organization with dedicated docs folder
+  - Updated all documentation references to new paths
+
+- **Documentation Organization**
+  - User guides → `docs/guides/`
+  - Deployment docs → `docs/deployment/`
+  - Development docs → `docs/development/`
+  - Security docs → `docs/security/`
+  - Deployment scripts → `scripts/`
+  - GitHub-specific docs → `.github/docs/`
+
+- **Technical Changes**
+  - Updated Kubernetes deployment to properly expose environment variables from ConfigMap
+  - Modified TrustedHostMiddleware configuration to support wildcard hosts for development
+  - Improved deployment script with proper error handling and status checks
 
 ### Technical Details
 - Minikube deployment uses local Docker daemon via `eval $(minikube docker-env)`

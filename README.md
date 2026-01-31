@@ -137,7 +137,7 @@ For local Kubernetes testing and development:
 2. **Quick Deploy**
    ```bash
    # Run the automated deployment script
-   ./deploy-to-minikube.sh
+   ./scripts/deploy-to-minikube.sh
    ```
 
 3. **Access the Application**
@@ -149,7 +149,7 @@ For local Kubernetes testing and development:
    minikube service family-tree-web -n family-tree
    ```
 
-4. **See [MINIKUBE_DEPLOYMENT.md](MINIKUBE_DEPLOYMENT.md) for:**
+4. **See [MINIKUBE_DEPLOYMENT.md](docs/deployment/MINIKUBE_DEPLOYMENT.md) for:**
    - Step-by-step deployment guide
    - Troubleshooting tips
    - Manual deployment steps
@@ -215,9 +215,18 @@ For detailed usage instructions, admin portal setup, and troubleshooting, see [U
 
 ## Documentation
 
-- **[USER_GUIDE.md](USER_GUIDE.md)** - Complete user documentation with detailed instructions
-- **[CHANGELOG.md](CHANGELOG.md)** - Version history and release notes
-- **[k8s/README.md](k8s/README.md)** - Kubernetes deployment guide
+### User Guides
+- **[User Guide](docs/guides/USER_GUIDE.md)** - Complete user documentation with detailed instructions
+- **[CHANGELOG](CHANGELOG.md)** - Version history and release notes
+
+### Deployment
+- **[Kubernetes Deployment](k8s/README.md)** - Production Kubernetes deployment guide
+- **[Minikube Deployment](docs/deployment/MINIKUBE_DEPLOYMENT.md)** - Local Kubernetes testing with minikube
+- **[Update Guide](docs/deployment/UPDATE_GUIDE.md)** - How to update the application
+
+### Development
+- **[Release Process](docs/development/RELEASE_PROCESS.md)** - How to create and publish releases
+- **[Security Compliance](docs/security/SECURITY_COMPLIANCE.md)** - Security best practices and compliance
 
 ## License
 
